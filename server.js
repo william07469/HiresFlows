@@ -1055,7 +1055,7 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
   }
 });
 
-// Whop Webhook signature verification
+// Whop Webhook signature verification (Stripe-style: t=timestamp,v1=signature)
 function verifyWhopWebhook(req) {
   const signature = req.headers['x-whop-signature'];
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
@@ -1070,21 +1070,35 @@ function verifyWhopWebhook(req) {
     throw new Error('Missing x-whop-signature header');
   }
 
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(rawBody)
-    .digest('hex');
+  // Parse t=timestamp,v1=signature format
+  const parts = signature.split(',');
+  let timestamp = '';
+  let sigValue = '';
 
-  let cleanSig = signature;
-  if (cleanSig.startsWith('sha256=')) {
-    cleanSig = cleanSig.slice(7);
+  for (const part of parts) {
+    if (part.startsWith('t=')) {
+      timestamp = part.slice(2);
+    } else if (part.startsWith('v1=')) {
+      sigValue = part.slice(3);
+    }
   }
 
-  const sigBuffer = Buffer.from(cleanSig, 'utf8');
+  if (!timestamp || !sigValue) {
+    throw new Error('Invalid signature format');
+  }
+
+  // Compute expected signature: HMAC(timestamp.body)
+  const signedPayload = timestamp + '.' + rawBody.toString();
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(signedPayload)
+    .digest('hex');
+
+  const sigBuffer = Buffer.from(sigValue, 'utf8');
   const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
 
   if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-    console.error('Signature mismatch:', { received: cleanSig.slice(0, 10) + '...', expected: expectedSignature.slice(0, 10) + '...' });
+    console.error('Signature mismatch:', { received: sigValue.slice(0, 10) + '...', expected: expectedSignature.slice(0, 10) + '...' });
     throw new Error('Invalid webhook signature');
   }
 }
