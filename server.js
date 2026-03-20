@@ -1059,19 +1059,32 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
 // Whop Webhook signature verification using standardwebhooks
 function verifyWhopWebhook(req) {
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
+  const signature = req.headers['x-whop-signature'];
 
   if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
     console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - webhook verification skipped');
     return;
   }
 
+  if (!signature) {
+    throw new Error('Missing x-whop-signature header');
+  }
+
   const rawBody = req.rawBody || req.body;
   const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(JSON.stringify(rawBody));
   
-  const wh = new WhopWebhook(webhookSecret);
-  wh.verify(bodyBuffer, {
-    'x-whop-signature': req.headers['x-whop-signature']
-  });
+  // standardwebhooks expects base64 encoded secret
+  const base64Secret = Buffer.from(webhookSecret).toString('base64');
+  
+  try {
+    const wh = new WhopWebhook(base64Secret);
+    wh.verify(bodyBuffer, {
+      'x-whop-signature': signature
+    });
+  } catch (err) {
+    console.error('Webhook verify error:', err.message);
+    throw err;
+  }
 }
 
 // Middleware to capture raw body
