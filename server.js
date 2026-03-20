@@ -1059,7 +1059,6 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
 function verifyWhopWebhook(req) {
   const signature = req.headers['x-whop-signature'];
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
-  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
 
   if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
     console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - webhook verification skipped');
@@ -1087,8 +1086,22 @@ function verifyWhopWebhook(req) {
     throw new Error('Invalid signature format');
   }
 
+  // Get raw body - use req.rawBody if stored by middleware, otherwise try to reconstruct
+  let bodyStr;
+  if (req.rawBody) {
+    bodyStr = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString() : req.rawBody;
+  } else if (Buffer.isBuffer(req.body)) {
+    bodyStr = req.body.toString();
+  } else if (typeof req.body === 'string') {
+    bodyStr = req.body;
+  } else {
+    // Body was parsed to object, can't verify signature
+    console.error('Body was already parsed, cannot verify signature');
+    throw new Error('Body was already parsed, cannot verify signature');
+  }
+
   // Compute expected signature: HMAC(timestamp.body)
-  const signedPayload = timestamp + '.' + rawBody.toString();
+  const signedPayload = timestamp + '.' + bodyStr;
   const expectedSignature = crypto
     .createHmac('sha256', webhookSecret)
     .update(signedPayload)
@@ -1103,8 +1116,20 @@ function verifyWhopWebhook(req) {
   }
 }
 
+// Store raw body for webhook routes
+app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
+  req.rawBody = req.body;
+  next();
+});
+
+// Middleware to capture raw body
+app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
+  req.rawBody = req.body;
+  next();
+});
+
 // Webhook: Whop ödeme başarılı olduğunda çalışır
-app.post('/api/whop-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/whop-webhook', async (req, res) => {
   try {
     verifyWhopWebhook(req);
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
