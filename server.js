@@ -10,7 +10,6 @@ import multer from 'multer';
 import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
 import { Whop } from '@whop/sdk';
-import { Webhook as WhopWebhook } from 'standardwebhooks';
 import { calculateATSScore, calculateKeywordMatch, extractSkills, generateImprovements } from './ats-analyzer.js';
 import { selectRandomStyle } from './cv-styles.js';
 import { StorageService } from './src/job-tracker/storage-service.js';
@@ -1056,31 +1055,24 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
   }
 });
 
-// Whop Webhook signature verification using standardwebhooks
+// Whop Webhook signature verification using Whop SDK's unwrap method
 function verifyWhopWebhook(req) {
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
-  const signature = req.headers['x-whop-signature'];
 
   if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
     console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - webhook verification skipped');
     return;
   }
 
-  if (!signature) {
-    throw new Error('Missing x-whop-signature header');
-  }
-
   const rawBody = req.rawBody || req.body;
-  const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(JSON.stringify(rawBody));
-  
-  // standardwebhooks expects base64 encoded secret
-  const base64Secret = Buffer.from(webhookSecret).toString('base64');
+  const bodyString = Buffer.isBuffer(rawBody) ? rawBody.toString() : (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
   
   try {
-    const wh = new WhopWebhook(base64Secret);
-    wh.verify(bodyBuffer, {
-      'x-whop-signature': signature
+    const event = whop.webhooks.unwrap(bodyString, {
+      headers: req.headers,
+      key: webhookSecret
     });
+    return event;
   } catch (err) {
     console.error('Webhook verify error:', err.message);
     throw err;
@@ -1096,8 +1088,7 @@ app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, re
 // Webhook: Whop ödeme başarılı olduğunda çalışır
 app.post('/api/whop-webhook', async (req, res) => {
   try {
-    verifyWhopWebhook(req);
-    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const event = verifyWhopWebhook(req);
 
     // Ödeme başarılı — kullanıcıya erişim ver
     if (event.type === 'payment.succeeded' || event.type === 'checkout.session.completed') {
