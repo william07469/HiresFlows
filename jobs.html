@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Suggestions — HiresFlows</title>
+<meta name="description" content="AI-powered job suggestions based on your skills. Find the perfect career match.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2309090f' width='100' height='100' rx='20'/><text y='.9em' x='50%' text-anchor='middle' font-size='70' fill='%23c8f545'>✓</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090f;--s1:#0f0f18;--s2:#161622;--s3:#1e1e2d;
+  --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.1);--b3:rgba(255,255,255,.16);
+  --lime:#c8f545;--lime2:#a8d930;
+  --green:#4ff787;--rose:#f74f6a;--amber:#f7c24f;--sky:#4f8ef7;
+  --chalk:#eeeaf8;--chalk2:#a09cb8;--chalk3:#5a5672;
+  --r:8px;--r2:14px;--r3:20px;
+}
+body{background:var(--bg);color:var(--chalk);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(200,245,69,.07) 0%,transparent 55%);pointer-events:none;z-index:0}
+.z1{position:relative;z-index:1}
+
+.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid var(--b1);background:rgba(9,9,15,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100}
+.logo{font-family:'Syne',sans-serif;font-weight:900;font-size:18px;letter-spacing:-.5px;text-decoration:none;color:var(--chalk)}
+.logo span{color:var(--lime)}
+.nav-links{display:flex;gap:32px}
+.nav-links a{color:var(--chalk2);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--lime)}
+.btn-nav{font-size:13px;font-weight:700;padding:8px 20px;border-radius:var(--r2);background:var(--lime);border:none;color:var(--bg);cursor:pointer;font-family:'Syne',sans-serif;text-decoration:none;transition:background .15s}
+.btn-nav:hover{background:var(--lime2)}
+
+.container{max-width:1000px;margin:0 auto;padding:60px 24px}
+
+.hero{text-align:center;margin-bottom:48px}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-2px;margin-bottom:16px}
+.hero h1 .acc{color:var(--lime)}
+.hero p{font-size:17px;color:var(--chalk2);max-width:500px;margin:0 auto;line-height:1.7}
+
+.filters{display:flex;gap:12px;margin-bottom:32px;flex-wrap:wrap;justify-content:center}
+.filt{background:var(--s2);border:1px solid var(--b2);color:var(--chalk2);padding:10px 20px;border-radius:99px;font-size:13px;cursor:pointer;transition:all .2s}
+.filt:hover,.filt.active{border-color:var(--lime);color:var(--lime);background:rgba(200,245,69,.06)}
+
+.card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:24px;margin-bottom:16px;transition:all .2s}
+.card:hover{border-color:rgba(200,245,69,.3)}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.card-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-.5px}
+.card-industry{font-family:'DM Mono',monospace;font-size:10px;color:var(--lime);background:rgba(200,245,69,.1);padding:4px 10px;border-radius:99px;text-transform:uppercase;letter-spacing:.5px}
+.card-reason{font-size:14px;color:var(--chalk2);margin-bottom:16px;line-height:1.6}
+.card-meta{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.meta{font-size:12px;color:var(--chalk3)}
+.meta strong{color:var(--chalk)}
+.meta.salary{color:var(--green)}
+.meta.growth{color:var(--amber)}
+.card-skills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.skill{font-family:'DM Mono',monospace;font-size:10px;background:var(--s3);color:var(--chalk2);padding:4px 10px;border-radius:4px}
+.skill.matched{background:rgba(79,247,135,.1);color:var(--green)}
+.skill.missing{background:rgba(247,79,106,.1);color:var(--rose)}
+.card-actions{display:flex;gap:10px}
+.btn{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;padding:10px 20px;border-radius:var(--r);cursor:pointer;transition:all .15s;text-decoration:none;display:inline-block;text-align:center}
+.btn-primary{background:var(--lime);border:none;color:var(--bg)}
+.btn-primary:hover{background:var(--lime2)}
+.btn-outline{background:transparent;border:1px solid var(--b3);color:var(--chalk)}
+.btn-outline:hover{border-color:var(--lime);color:var(--lime)}
+
+.input-group{margin-bottom:20px}
+.input-group label{display:block;font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--chalk3);margin-bottom:8px}
+textarea{width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);color:var(--chalk);font-family:'DM Sans',sans-serif;font-size:13px;padding:14px;outline:none;resize:vertical;min-height:200px;line-height:1.6}
+textarea:focus{border-color:rgba(200,245,69,.35)}
+textarea::placeholder{color:var(--chalk3)}
+
+.btn-big{width:100%;padding:18px;background:var(--lime);border:none;border-radius:var(--r2);color:var(--bg);font-family:'Syne',sans-serif;font-size:17px;font-weight:900;cursor:pointer;transition:background .15s;margin-top:16px}
+.btn-big:hover{background:var(--lime2)}
+.btn-big:disabled{opacity:.35;cursor:not-allowed}
+
+.proc{text-align:center;padding:40px}
+.proc-ring{width:48px;height:48px;border:3px solid var(--b2);border-top-color:var(--lime);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.results{display:none;margin-top:40px}
+.results.on{display:block;animation:up .3s ease}
+
+.no-results{text-align:center;padding:60px;color:var(--chalk3)}
+.no-results h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;color:var(--chalk)}
+.no-results p{font-size:14px}
+
+.skills-detected{margin-bottom:32px}
+.skills-detected h3{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:12px}
+.skills-list{display:flex;gap:6px;flex-wrap:wrap}
+.skills-list span{font-family:'DM Mono',monospace;font-size:11px;background:rgba(200,245,69,.1);color:var(--lime);padding:6px 12px;border-radius:99px}
+
+.cv-input{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:28px;margin-bottom:32px}
+.cv-input h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:4px}
+.cv-input p{font-size:13px;color:var(--chalk3);margin-bottom:16px}
+
+footer{text-align:center;padding:40px 20px;border-top:1px solid var(--b1);margin-top:60px}
+footer a{color:var(--chalk3);text-decoration:none;font-size:12px;margin:0 12px}
+footer a:hover{color:var(--lime)}
+
+@media(max-width:640px){
+  .nav{padding:14px 20px;flex-wrap:wrap;gap:12px}
+  .nav-links{order:-1;width:100%;justify-content:center;gap:16px}
+  .hero{padding:0}
+  .filters{gap:8px}
+  .filt{padding:8px 14px;font-size:12px}
+  .container{padding:32px 16px}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="logo">Get<span>Hired</span>Faster</a>
+  <div class="nav-links">
+    <a href="/">Fix CV</a>
+    <a href="/jobs.html" class="active">Job Suggestions</a>
+    <a href="/how-it-works.html">How It Works</a>
+    <a href="/pricing.html">Pricing</a>
+  </div>
+  <a href="/" class="btn-nav">Fix My CV →</a>
+</nav>
+
+<div class="container z1">
+  <div class="hero">
+    <h1>Find Your <span class="acc">Perfect Job</span></h1>
+    <p>Based on your skills and experience, we'll suggest the best matching positions and show you how to land them.</p>
+  </div>
+
+  <div class="cv-input">
+    <h3>1. Paste Your CV</h3>
+    <p>We'll analyze your skills and match them with the best job opportunities.</p>
+    <textarea id="cvArea" placeholder="Paste your CV here...
+
+Example:
+John Smith
+Software Developer
+
+Skills: JavaScript, React, Node.js, Python, SQL
+Experience: 3 years at TechCorp as Full Stack Developer
+Education: BS Computer Science
+
+..."></textarea>
+  </div>
+
+  <div class="filters">
+    <div class="filt active" data-level="">All Levels</div>
+    <div class="filt" data-level="Entry">Entry Level</div>
+    <div class="filt" data-level="Mid">Mid Level</div>
+    <div class="filt" data-level="Senior">Senior</div>
+  </div>
+
+  <button class="btn-big" id="analyzeBtn" onclick="getJobSuggestions()">
+    ⚡ Find My Jobs →
+  </button>
+
+  <div class="proc" id="proc" style="display:none">
+    <div class="proc-ring"></div>
+    <div style="font-size:14px;font-weight:600">Analyzing your skills...</div>
+    <div style="font-size:12px;color:var(--chalk3);margin-top:4px">Matching with 25+ job positions</div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="skills-detected">
+      <h3>Detected Skills</h3>
+      <div class="skills-list" id="skillsList"></div>
+    </div>
+
+    <h3 style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:16px">Best Matching Jobs</h3>
+    <div id="jobsList"></div>
+  </div>
+
+  <div class="no-results" id="noResults" style="display:none">
+    <h3>No matching jobs found</h3>
+    <p>Try adding more skills to your CV or adjust the filters.</p>
+  </div>
+</div>
+
+<footer>
+  <a href="/">Home</a>
+  <a href="/terms.html">Terms</a>
+  <a href="/privacy.html">Privacy</a>
+  <span style="margin:0 12px;color:var(--chalk3)">© 2026 HiresFlows</span>
+</footer>
+
+<script>
+var _sessionId = localStorage.getItem('ghf_sid');
+if (!_sessionId) {
+  _sessionId = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+  localStorage.setItem('ghf_sid', _sessionId);
+}
+
+var _selectedLevel = '';
+
+// Filter clicks
+document.querySelectorAll('.filt').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filt').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    _selectedLevel = this.dataset.level;
+  });
+});
+
+async function getJobSuggestions() {
+  var cvText = document.getElementById('cvArea').value.trim();
+  
+  if (!cvText) {
+    alert('Please paste your CV first');
+    return;
+  }
+  
+  var btn = document.getElementById('analyzeBtn');
+  var proc = document.getElementById('proc');
+  var results = document.getElementById('results');
+  var noResults = document.getElementById('noResults');
+  
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+  proc.style.display = 'block';
+  results.classList.remove('on');
+  noResults.style.display = 'none';
+  
+  try {
+    var res = await fetch('/api/job-suggestions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-session-id': _sessionId
+      },
+      body: JSON.stringify({
+        cvText: cvText,
+        preferredLevel: _selectedLevel || undefined
+      })
+    });
+    
+    var data = await res.json();
+    
+    proc.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '⚡ Find My Jobs →';
+    
+    if (data.suggestions && data.suggestions.length > 0) {
+      renderResults(data);
+      results.classList.add('on');
+    } else {
+      noResults.style.display = 'block';
+    }
+    
+  } catch(e) {
+    proc.style.display = 'none';
+    btn.disabled = false;
+    btn.textContent = '⚡ Find My Jobs →';
+    alert('Error: ' + e.message);
+  }
+}
+
+function renderResults(data) {
+  // Render skills
+  var skillsEl = document.getElementById('skillsList');
+  skillsEl.innerHTML = '';
+  data.extractedSkills.forEach(function(skill) {
+    var span = document.createElement('span');
+    span.textContent = skill;
+    skillsEl.appendChild(span);
+  });
+  
+  // Render jobs
+  var jobsEl = document.getElementById('jobsList');
+  jobsEl.innerHTML = '';
+  
+  data.suggestions.forEach(function(job) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    
+    var skillsHtml = '';
+    job.matchedSkills.forEach(function(s) {
+      skillsHtml += '<span class="skill matched">' + s + '</span>';
+    });
+    job.missingSkills.forEach(function(s) {
+      skillsHtml += '<span class="skill missing">+' + s + '</span>';
+    });
+    
+    card.innerHTML = 
+      '<div class="card-header">' +
+        '<div class="card-title">' + job.title + '</div>' +
+        '<span class="card-industry">' + job.industry + '</span>' +
+      '</div>' +
+      '<div class="card-reason">Match Score: ' + job.matchPercentage + '% — ' + job.matchedSkills.length + ' skills matched</div>' +
+      '<div class="card-meta">' +
+        '<div class="meta"><strong>Level:</strong> ' + job.level + '</div>' +
+        '<div class="meta salary"><strong>Salary:</strong> ' + job.salary + '</div>' +
+      '</div>' +
+      '<div class="card-skills">' + skillsHtml + '</div>' +
+      '<div class="card-actions">' +
+        '<a href="/" class="btn btn-primary">Fix CV for This Role →</a>' +
+      '</div>';
+    
+    jobsEl.appendChild(card);
+  });
+}
+</script>
+</body>
+</html>

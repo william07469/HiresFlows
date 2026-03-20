@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — HiresFlows</title>
+<meta name="description" content="Simple, transparent pricing. Fix unlimited CVs for less than a cup of coffee per day.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2309090f' width='100' height='100' rx='20'/><text y='.9em' x='50%' text-anchor='middle' font-size='70' fill='%23c8f545'>✓</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800;900&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090f;--s1:#0f0f18;--s2:#161622;--s3:#1e1e2d;
+  --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.1);--b3:rgba(255,255,255,.16);
+  --lime:#c8f545;--lime2:#a8d930;
+  --green:#4ff787;--rose:#f74f6a;--amber:#f7c24f;--sky:#4f8ef7;
+  --chalk:#eeeaf8;--chalk2:#a09cb8;--chalk3:#5a5672;
+  --r:8px;--r2:14px;--r3:20px;
+}
+body{background:var(--bg);color:var(--chalk);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(200,245,69,.07) 0%,transparent 55%);pointer-events:none;z-index:0}
+.z1{position:relative;z-index:1}
+
+.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid var(--b1);background:rgba(9,9,15,.85);backdrop-filter:blur(10px);position:sticky;top:0;z-index:100}
+.logo{font-family:'Syne',sans-serif;font-weight:900;font-size:18px;letter-spacing:-.5px;text-decoration:none;color:var(--chalk)}
+.logo span{color:var(--lime)}
+.nav-links{display:flex;gap:32px}
+.nav-links a{color:var(--chalk2);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
+.nav-links a:hover,.nav-links a.active{color:var(--lime)}
+.btn-nav{font-size:13px;font-weight:700;padding:8px 20px;border-radius:var(--r2);background:var(--lime);border:none;color:var(--bg);cursor:pointer;font-family:'Syne',sans-serif;text-decoration:none;transition:background .15s}
+.btn-nav:hover{background:var(--lime2)}
+
+.container{max-width:900px;margin:0 auto;padding:60px 24px}
+
+.hero{text-align:center;margin-bottom:48px}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(32px,5vw,52px);font-weight:900;letter-spacing:-2px;margin-bottom:16px}
+.hero h1 .acc{color:var(--lime)}
+.hero p{font-size:17px;color:var(--chalk2);max-width:500px;margin:0 auto;line-height:1.7}
+
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:60px}
+.pc{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:32px;position:relative}
+.pc.featured{border:2px solid var(--lime)}
+.pc-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-family:'DM Mono',monospace;font-size:9px;background:var(--lime);color:var(--bg);padding:4px 14px;border-radius:99px;white-space:nowrap;letter-spacing:.5px}
+.pc-plan{font-family:'DM Mono',monospace;font-size:10px;color:var(--chalk3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px}
+.pc-name{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;margin-bottom:4px}
+.pc-price{font-family:'Syne',sans-serif;font-size:40px;font-weight:900;color:var(--lime);letter-spacing:-2px;margin-bottom:4px}
+.pc-price span{font-size:14px;font-weight:400;color:var(--chalk3)}
+.pc-desc{font-size:13px;color:var(--chalk3);margin-bottom:24px;min-height:40px}
+.pc-feats{text-align:left;display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.pf{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--chalk2)}
+.pf::before{content:'✓';color:var(--lime);font-weight:700;font-size:12px;flex-shrink:0}
+.pf.no{color:var(--chalk3)}.pf.no::before{content:'✗';color:var(--chalk3)}
+.btn-pc{width:100%;padding:14px;border-radius:var(--r);font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-pc-primary{background:var(--lime);color:var(--bg)}
+.btn-pc-primary:hover{background:var(--lime2)}
+.btn-pc-outline{background:transparent;border:1px solid var(--b3);color:var(--chalk)}
+.btn-pc-outline:hover{border-color:var(--lime);color:var(--lime)}
+
+.compare{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:32px;margin-bottom:40px}
+.compare h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;text-align:center;margin-bottom:24px}
+.compare-table{width:100%;border-collapse:collapse}
+.compare-table th{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:var(--chalk3);text-align:left;padding:12px 16px;border-bottom:1px solid var(--b1)}
+.compare-table th:not(:first-child){text-align:center}
+.compare-table td{padding:14px 16px;font-size:13px;color:var(--chalk2);border-bottom:1px solid var(--b1)}
+.compare-table td:not(:first-child){text-align:center}
+.compare-table tr:last-child td{border-bottom:none}
+.compare-table .check{color:var(--green)}
+.compare-table .cross{color:var(--chalk3)}
+
+.guarantee{background:linear-gradient(135deg,rgba(79,247,135,.1) 0%,transparent 50%);border:1px solid rgba(79,247,135,.2);border-radius:var(--r3);padding:32px;text-align:center;margin-bottom:40px}
+.guarantee-icon{font-size:40px;margin-bottom:12px}
+.guarantee h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;color:var(--green)}
+.guarantee p{font-size:14px;color:var(--chalk2);max-width:400px;margin:0 auto}
+
+.testimonials{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:32px;margin-bottom:40px}
+.testimonials h2{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;text-align:center;margin-bottom:24px}
+.test-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.test{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:20px}
+.test-text{font-size:13px;color:var(--chalk2);line-height:1.6;margin-bottom:12px;font-style:italic}
+.test-author{font-size:12px;font-weight:600;color:var(--chalk)}
+.test-result{font-family:'DM Mono',monospace;font-size:10px;color:var(--green);margin-top:4px}
+
+footer{text-align:center;padding:40px 20px;border-top:1px solid var(--b1);margin-top:60px}
+footer a{color:var(--chalk3);text-decoration:none;font-size:12px;margin:0 12px}
+footer a:hover{color:var(--lime)}
+
+@media(max-width:768px){
+  .pricing-grid{grid-template-columns:1fr}
+  .compare-table{font-size:11px}
+  .test-grid{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .nav{padding:14px 20px;flex-wrap:wrap;gap:12px}
+  .nav-links{order:-1;width:100%;justify-content:center;gap:16px}
+  .container{padding:32px 16px}
+}
+</style>
+</head>
+<body>
+<nav class="nav">
+  <a href="/" class="logo">Get<span>Hired</span>Faster</a>
+  <div class="nav-links">
+    <a href="/">Fix CV</a>
+    <a href="/jobs.html">Job Suggestions</a>
+    <a href="/how-it-works.html">How It Works</a>
+    <a href="/pricing.html" class="active">Pricing</a>
+  </div>
+  <a href="/" class="btn-nav">Fix My CV →</a>
+</nav>
+
+<div class="container z1">
+  <div class="hero">
+    <h1>Simple, <span class="acc">Transparent</span> Pricing</h1>
+    <p>Start free. Upgrade when you're ready. Cancel anytime.</p>
+  </div>
+
+  <div class="pricing-grid">
+    <div class="pc">
+      <div class="pc-plan">Free</div>
+      <div class="pc-name">Try It Out</div>
+      <div class="pc-price">$0</div>
+      <div class="pc-desc">Perfect for testing the waters</div>
+      <div class="pc-feats">
+        <div class="pf">1 CV fix</div>
+        <div class="pf">ATS score check</div>
+        <div class="pf">Keyword analysis</div>
+        <div class="pf">PDF download</div>
+        <div class="pf no">Unlimited fixes</div>
+        <div class="pf no">Cover letters</div>
+        <div class="pf no">Job matching</div>
+      </div>
+      <button class="btn-pc btn-pc-outline" onclick="window.location.href='/'">Get Started Free</button>
+    </div>
+
+    <div class="pc featured">
+      <div class="pc-badge">MOST POPULAR</div>
+      <div class="pc-plan">Pro</div>
+      <div class="pc-name">Active Job Search</div>
+      <div class="pc-price">$19<span>/month</span></div>
+      <div class="pc-desc">For serious job seekers</div>
+      <div class="pc-feats">
+        <div class="pf">Unlimited CV fixes</div>
+        <div class="pf">Cover letters</div>
+        <div class="pf">Interview prep</div>
+        <div class="pf">ATS optimization</div>
+        <div class="pf">Job matching</div>
+        <div class="pf">CV version history</div>
+        <div class="pf">Priority support</div>
+      </div>
+      <button class="btn-pc btn-pc-primary" onclick="window.location.href='/'">Get Pro Access</button>
+    </div>
+
+    <div class="pc">
+      <div class="pc-plan">Starter</div>
+      <div class="pc-name">Quick Fix</div>
+      <div class="pc-price">$9</div>
+      <div class="pc-desc">One-time payment, 5 fixes</div>
+      <div class="pc-feats">
+        <div class="pf">5 CV fixes</div>
+        <div class="pf">ATS optimization</div>
+        <div class="pf">Keyword analysis</div>
+        <div class="pf">PDF download</div>
+        <div class="pf">Cover letters</div>
+        <div class="pf no">Unlimited access</div>
+        <div class="pf no">Job matching</div>
+      </div>
+      <button class="btn-pc btn-pc-outline" onclick="window.location.href='/'">Get Starter</button>
+    </div>
+  </div>
+
+  <div class="compare">
+    <h2>Compare Plans</h2>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Free</th>
+          <th>Starter</th>
+          <th>Pro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CV fixes</td>
+          <td class="check">1</td>
+          <td>5</td>
+          <td>∞</td>
+        </tr>
+        <tr>
+          <td>ATS score check</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+        </tr>
+        <tr>
+          <td>Keyword optimization</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+        </tr>
+        <tr>
+          <td>Cover letters</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+          <td class="check">✓</td>
+        </tr>
+        <tr>
+          <td>Interview prep</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+        </tr>
+        <tr>
+          <td>Job matching</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+        </tr>
+        <tr>
+          <td>CV version history</td>
+          <td class="cross">✗</td>
+          <td class="cross">✗</td>
+          <td class="check">✓</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="guarantee">
+    <div class="guarantee-icon">🛡️</div>
+    <h3>30-Day Money-Back Guarantee</h3>
+    <p>If you don't get more interviews within 30 days, we'll refund your Pro subscription. No questions asked.</p>
+  </div>
+
+  <div class="testimonials">
+    <h2>What Users Are Saying</h2>
+    <div class="test-grid">
+      <div class="test">
+        <div class="test-text">"My ATS score went from 45 to 92 after one fix. Landed 3 interviews in my first week."</div>
+        <div class="test-author">— Sarah M., Software Engineer</div>
+        <div class="test-result">+94% ATS Score → 3 Interviews</div>
+      </div>
+      <div class="test">
+        <div class="test-text">"Finally passing the LinkedIn easy apply filters. Getting recruiter messages daily now."</div>
+        <div class="test-author">— James K., Product Manager</div>
+        <div class="test-result">Daily Recruiter Messages</div>
+      </div>
+      <div class="test">
+        <div class="test-text">"The cover letter feature alone is worth the subscription. Tailored to each job perfectly."</div>
+        <div class="test-author">— Emily R., Marketing Manager</div>
+        <div class="test-result">Cover Letters That Work</div>
+      </div>
+      <div class="test">
+        <div class="test-text">"Used the job matching feature and found a role I never would have searched for. Perfect fit."</div>
+        <div class="test-author">— David L., Data Scientist</div>
+        <div class="test-result">Found Dream Job</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <a href="/">Home</a>
+  <a href="/jobs.html">Jobs</a>
+  <a href="/how-it-works.html">How It Works</a>
+  <a href="/terms.html">Terms</a>
+  <a href="/privacy.html">Privacy</a>
+  <span style="margin:0 12px;color:var(--chalk3)">© 2026 HiresFlows</span>
+</footer>
+</body>
+</html>
