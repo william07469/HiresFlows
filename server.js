@@ -1059,7 +1059,7 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
 function verifyWhopWebhook(req) {
   const signature = req.headers['x-whop-signature'];
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
-  const rawBody = Buffer.isBuffer(req.body) ? req.body.toString() : JSON.stringify(req.body);
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
 
   if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
     console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - webhook verification skipped');
@@ -1075,10 +1075,16 @@ function verifyWhopWebhook(req) {
     .update(rawBody)
     .digest('hex');
 
-  const sigBuffer = Buffer.from(signature, 'utf8');
+  let cleanSig = signature;
+  if (cleanSig.startsWith('sha256=')) {
+    cleanSig = cleanSig.slice(7);
+  }
+
+  const sigBuffer = Buffer.from(cleanSig, 'utf8');
   const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
 
   if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    console.error('Signature mismatch:', { received: cleanSig.slice(0, 10) + '...', expected: expectedSignature.slice(0, 10) + '...' });
     throw new Error('Invalid webhook signature');
   }
 }
