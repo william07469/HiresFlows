@@ -10,6 +10,7 @@ import multer from 'multer';
 import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
 import { Whop } from '@whop/sdk';
+import { Webhook as WhopWebhook } from 'standardwebhooks';
 import { calculateATSScore, calculateKeywordMatch, extractSkills, generateImprovements } from './ats-analyzer.js';
 import { selectRandomStyle } from './cv-styles.js';
 import { StorageService } from './src/job-tracker/storage-service.js';
@@ -1055,9 +1056,8 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
   }
 });
 
-// Whop Webhook signature verification (Stripe-style: t=timestamp,v1=signature)
+// Whop Webhook signature verification using standardwebhooks
 function verifyWhopWebhook(req) {
-  const signature = req.headers['x-whop-signature'];
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
 
   if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
@@ -1065,62 +1065,14 @@ function verifyWhopWebhook(req) {
     return;
   }
 
-  if (!signature) {
-    throw new Error('Missing x-whop-signature header');
-  }
-
-  // Parse t=timestamp,v1=signature format
-  const parts = signature.split(',');
-  let timestamp = '';
-  let sigValue = '';
-
-  for (const part of parts) {
-    if (part.startsWith('t=')) {
-      timestamp = part.slice(2);
-    } else if (part.startsWith('v1=')) {
-      sigValue = part.slice(3);
-    }
-  }
-
-  if (!timestamp || !sigValue) {
-    throw new Error('Invalid signature format');
-  }
-
-  // Get raw body - use req.rawBody if stored by middleware, otherwise try to reconstruct
-  let bodyStr;
-  if (req.rawBody) {
-    bodyStr = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString() : req.rawBody;
-  } else if (Buffer.isBuffer(req.body)) {
-    bodyStr = req.body.toString();
-  } else if (typeof req.body === 'string') {
-    bodyStr = req.body;
-  } else {
-    // Body was parsed to object, can't verify signature
-    console.error('Body was already parsed, cannot verify signature');
-    throw new Error('Body was already parsed, cannot verify signature');
-  }
-
-  // Compute expected signature: HMAC(timestamp.body)
-  const signedPayload = timestamp + '.' + bodyStr;
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(signedPayload)
-    .digest('hex');
-
-  const sigBuffer = Buffer.from(sigValue, 'utf8');
-  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
-
-  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
-    console.error('Signature mismatch:', { received: sigValue.slice(0, 10) + '...', expected: expectedSignature.slice(0, 10) + '...' });
-    throw new Error('Invalid webhook signature');
-  }
+  const rawBody = req.rawBody || req.body;
+  const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(JSON.stringify(rawBody));
+  
+  const wh = new WhopWebhook(webhookSecret);
+  wh.verify(bodyBuffer, {
+    'x-whop-signature': req.headers['x-whop-signature']
+  });
 }
-
-// Store raw body for webhook routes
-app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
-  req.rawBody = req.body;
-  next();
-});
 
 // Middleware to capture raw body
 app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
