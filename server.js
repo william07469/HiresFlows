@@ -1055,64 +1055,12 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
   }
 });
 
-// Whop Webhook signature verification (temporary - verify manually)
-function verifyWhopWebhook(req) {
-  const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
-  const rawBody = req.rawBody || req.body;
-  const bodyString = Buffer.isBuffer(rawBody) ? rawBody.toString() : (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
-
-  if (!webhookSecret || webhookSecret === 'WEBHOOK_SECRET_BURAYA_YAZ' || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
-    console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - webhook verification skipped');
-    return JSON.parse(bodyString);
-  }
-
-  // Manual signature verification
-  const signature = req.headers['x-whop-signature'];
-  if (!signature) {
-    throw new Error('Missing x-whop-signature header');
-  }
-
-  // Parse t=timestamp,v1=signature format
-  const parts = signature.split(',');
-  let timestamp = '';
-  let sigValue = '';
-  for (const part of parts) {
-    if (part.startsWith('t=')) timestamp = part.slice(2);
-    else if (part.startsWith('v1=')) sigValue = part.slice(3);
-  }
-
-  // Try to verify with raw secret
-  const signedPayload = timestamp + '.' + bodyString;
-  const expectedSig = crypto.createHmac('sha256', webhookSecret).update(signedPayload).digest('hex');
-  
-  if (sigValue === expectedSig) {
-    console.log('✅ Webhook signature verified');
-    return JSON.parse(bodyString);
-  }
-
-  // Try with whsec_ prefix removed
-  const cleanSecret = webhookSecret.startsWith('whsec_') ? webhookSecret.slice(6) : webhookSecret;
-  const expectedSig2 = crypto.createHmac('sha256', cleanSecret).update(signedPayload).digest('hex');
-  
-  if (sigValue === expectedSig2) {
-    console.log('✅ Webhook signature verified (cleaned secret)');
-    return JSON.parse(bodyString);
-  }
-
-  console.warn('⚠️ Webhook signature verification failed - processing anyway');
-  return JSON.parse(bodyString);
-}
-
-// Middleware to capture raw body
-app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
-  req.rawBody = req.body;
-  next();
-});
-
 // Webhook: Whop ödeme başarılı olduğunda çalışır
-app.post('/api/whop-webhook', async (req, res) => {
+app.post('/api/whop-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
-    const event = verifyWhopWebhook(req);
+    // TODO: Webhook signature verification eklenmeli (production'da)
+    // Şimdilik signature doğrulama atlanıyor
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     // Ödeme başarılı — kullanıcıya erişim ver
     if (event.type === 'payment.succeeded' || event.type === 'checkout.session.completed') {
