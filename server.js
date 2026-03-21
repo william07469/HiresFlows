@@ -235,7 +235,7 @@ function saveUsers() {
 const users = loadUsers();
 
 const PLANS = {
-  free: { freeUses: 1, name: 'Free', price: 0 },
+  free: { freeUses: 3, name: 'Free', price: 0 },
   starter: { freeUses: 5, name: 'Starter', price: 9 },
   pro: { freeUses: Infinity, name: 'Pro', price: 19, isSubscription: true }
 };
@@ -315,7 +315,16 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy: origin not allowed'));
+    }
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-whop-user-id'],
   maxAge: 86400
@@ -409,18 +418,20 @@ console.log('✓ Job Application Tracker initialized');
 // ═══════════════════════════════════════════════════════
 
 // Kullanıcı durumunu döndür (frontend bununla UI'ı günceller)
-// TEMPORARY: Show unlimited credits for testing
 app.get('/api/me', rateLimit, (req, res) => {
   const userId = getUserId(req);
   const user = getUser(userId);
+  const planConfig = PLANS[user.plan] || PLANS.free;
+  const isPremium = user.plan === 'pro' || (user.plan === 'starter' && user.freeUsesLeft > 0);
+  
   res.json({
     userId,
-    plan: 'pro', // Show as pro for testing
-    planName: 'Pro (Testing)',
-    freeUsesLeft: 999, // Show unlimited
+    plan: user.plan,
+    planName: planConfig.name,
+    freeUsesLeft: user.freeUsesLeft,
     totalFixes: user.totalFixes,
-    canFix: true, // Always allow
-    isPremium: true // Show as premium
+    canFix: user.freeUsesLeft > 0 || user.plan === 'pro',
+    isPremium
   });
 });
 
@@ -949,16 +960,15 @@ app.post('/api/fix-cv', rateLimit, async (req, res) => {
     const userId = getUserId(req);
     const user = getUser(userId);
 
-    // TEMPORARY: Credit check disabled for testing
-    // if (user.freeUsesLeft <= 0) {
-    //   return res.status(402).json({
-    //     error: 'No credits remaining. Upgrade required.',
-    //     code: 'NO_CREDITS',
-    //     needsUpgrade: true,
-    //     plan: user.plan,
-    //     creditsLeft: 0
-    //   });
-    // }
+    if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
+      return res.status(402).json({
+        error: 'No credits remaining. Upgrade required.',
+        code: 'NO_CREDITS',
+        needsUpgrade: true,
+        plan: user.plan,
+        creditsLeft: 0
+      });
+    }
 
     const { prompt } = req.body;
     if (!prompt || !validatePrompt(prompt)) {
@@ -1024,8 +1034,8 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
       }
     }
 
-    // TEMPORARY: Credit deduction disabled for testing
-    // if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    // Kredi düş
+    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
     user.totalFixes++;
     saveUsers();
     incrementFixes();
@@ -1039,7 +1049,7 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     jsonData.cvVersion = cvVer.version;
 
     jsonData._style = style.name;
-    jsonData.creditsLeft = 999; // Show unlimited credits for testing
+    jsonData.creditsLeft = user.freeUsesLeft;
     res.json(jsonData);
 
   } catch (error) {

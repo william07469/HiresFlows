@@ -67,24 +67,24 @@ export function calculateATSScore(cvText, jdText = '') {
   } else {
     score += 5;
     if (!hasBullets) issues.push('Bullet point kullan (•, -, *)');
-    if (hasSections < 3) issues.push('Experience, Education, Skills bölümleri ekle');
-    if (!hasContactInfo) issues.push('İletişim bilgileri ve LinkedIn ekle');
+    if (hasSections < 3) issues.push('Add Experience, Education, Skills sections');
+    if (!hasContactInfo) issues.push('Add contact info and LinkedIn URL');
   }
 
   // 2. Kelime Sayısı (10 puan)
   const wordCount = cvText.split(/\s+/).length;
   if (wordCount >= 400 && wordCount <= 800) {
     score += 10;
-    strengths.push(`Optimal uzunluk (${wordCount} kelime)`);
+    strengths.push(`Optimal length (${wordCount} words)`);
   } else if (wordCount >= 300 && wordCount < 400) {
     score += 6;
-    recommendations.push('300-400 kelime daha ekle');
+    recommendations.push('Add 300-400 more words');
   } else if (wordCount < 300) {
     score += 2;
-    issues.push(`Çok kısa (${wordCount} kelime) - en az 400 kelime olmalı`);
+    issues.push(`Too short (${wordCount} words) - aim for 400+ words`);
   } else {
     score += 5;
-    issues.push(`Çok uzun (${wordCount} kelime) - 800 kelimeye indir`);
+    issues.push(`Too long (${wordCount} words) - trim to 800 words`);
   }
 
   // 3. Sayısal Metrikler (20 puan) - ATS'nin en önemsediği
@@ -96,10 +96,10 @@ export function calculateATSScore(cvText, jdText = '') {
     strengths.push(`Güçlü metrik kullanımı (${metricCount} adet)`);
   } else if (metricCount >= 4) {
     score += 12;
-    recommendations.push(`${8 - metricCount} metrik daha ekle (%, $, x)`);
-  } else {
-    score += 4;
-    issues.push(`Çok az metrik (${metricCount}) - her başarıya sayı ekle`);
+    recommendations.push(`Add ${8 - metricCount} more metrics (%, $, x)`);
+  } else if (metricCount < 4) {
+    score += 2;
+    issues.push(`Too few metrics (${metricCount}) - add numbers to achievements`);
   }
 
   // 4. Action Verbs (15 puan)
@@ -109,7 +109,7 @@ export function calculateATSScore(cvText, jdText = '') {
     strengths.push(`Güçlü action verb kullanımı (${actionCount})`);
   } else if (actionCount >= 5) {
     score += 9;
-    recommendations.push('Daha fazla action verb ekle (Led, Managed, Developed)');
+    recommendations.push('Add more action verbs (Led, Managed, Developed)');
   } else {
     score += 3;
     issues.push(`Zayıf action verb (${actionCount}) - Led, Managed, Achieved kullan`);
@@ -122,23 +122,18 @@ export function calculateATSScore(cvText, jdText = '') {
     strengths.push(`Zengin teknik skill (${techCount})`);
   } else if (techCount >= 6) {
     score += 12;
-    recommendations.push(`${12 - techCount} teknik skill daha ekle`);
-  } else {
-    score += 5;
-    issues.push(`Az teknik skill (${techCount}) - teknolojileri açıkça belirt`);
+    recommendations.push(`Add ${12 - techCount} more technical skills`);
   }
-
-  // 6. Soft Skills (10 puan)
-  const softCount = cvKeywords.softSkills.length;
-  if (softCount >= 5) {
-    score += 10;
-    strengths.push('İyi soft skill dengesi');
-  } else if (softCount >= 3) {
-    score += 6;
-    recommendations.push('Daha fazla soft skill ekle');
-  } else {
-    score += 2;
-    issues.push('Leadership, teamwork, communication ekle');
+  
+  // Soft skills (20%)
+  const softWords = ['leadership', 'communication', 'teamwork', 'problem-solving', 'analytical', 'creative', 'collaborative', 'strategic', 'initiative', 'adaptability', 'time management', 'critical thinking'];
+  const softCount = softWords.filter(w => lowCV.includes(w)).length;
+  score += Math.min(softCount * 2, 10);
+  if (softCount < 3) {
+    recommendations.push('Add more soft skills');
+  }
+  if (softCount === 0) {
+    issues.push('Add leadership, teamwork, communication skills');
   }
 
   // 7. Red Flags - Zayıf İfadeler (-15 puan)
@@ -242,7 +237,7 @@ export function generateImprovements(cvText, jdText, analysis) {
       category: 'Quantifiable Results',
       issue: `Sadece ${analysis.metrics} metrik var`,
       fix: 'Her başarıya sayı ekle',
-      examples: ['%artış (örn: +35% revenue)', '$değer (örn: $2.4M budget)', 'Kişi sayısı (örn: 12-person team)', 'Süre (örn: 3 weeks early)']
+      examples: ['%increase (e.g., +35% revenue)', '$value (e.g., $2.4M budget)', 'Team size (e.g., 12-person team)', 'Duration (e.g., 3 weeks early)']
     });
   }
 
@@ -251,8 +246,8 @@ export function generateImprovements(cvText, jdText, analysis) {
     improvements.push({
       priority: 'CRITICAL',
       category: 'JD Keyword Match',
-      issue: `JD ile sadece %${analysis.keywordMatch.score} uyumlu`,
-      fix: 'Bu kritik keyword\'leri ekle',
+      issue: `Only ${analysis.keywordMatch.score}% match with JD`,
+      fix: 'Add these critical keywords',
       examples: analysis.keywordMatch.criticalMissing.slice(0, 8)
     });
   }
@@ -262,8 +257,8 @@ export function generateImprovements(cvText, jdText, analysis) {
     improvements.push({
       priority: 'MEDIUM',
       category: 'Action Verbs',
-      issue: `Sadece ${analysis.actionVerbs} action verb`,
-      fix: 'Her bullet\'i güçlü verb ile başlat',
+      issue: `Only ${analysis.actionVerbs} action verbs`,
+      fix: 'Start each bullet with a strong verb',
       examples: ['Led', 'Managed', 'Developed', 'Implemented', 'Achieved', 'Optimized']
     });
   }
@@ -273,9 +268,9 @@ export function generateImprovements(cvText, jdText, analysis) {
     improvements.push({
       priority: 'MEDIUM',
       category: 'Technical Skills',
-      issue: `Sadece ${analysis.techSkills} teknik skill`,
-      fix: 'Kullandığın tüm teknolojileri ekle',
-      examples: ['Programlama dilleri', 'Framework\'ler', 'Veritabanları', 'Cloud platformları']
+      issue: `Only ${analysis.techSkills} technical skills`,
+      fix: 'Add all technologies you use',
+      examples: ['Programming languages', 'Frameworks', 'Databases', 'Cloud platforms']
     });
   }
 
