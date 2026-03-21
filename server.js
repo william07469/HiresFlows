@@ -304,24 +304,32 @@ function getUserId(req) {
 // ═══════════════════════════════════════════════════════
 
 const allowedOrigins = [
-  'http://localhost:3001',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:8080',
-  'http://localhost:5500',
+  // Production
   'https://hiresflows-production.up.railway.app',
-  'https://hiresflows-production-8176.up.railway.app',
+  // Development only
+  ...(process.env.NODE_ENV !== 'production' ? [
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8080',
+    'http://localhost:5500'
+  ] : []),
+  // Custom frontend URL
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc)
     if (!origin) {
       return callback(null, true);
     }
+    
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      // Log blocked origins for debugging
+      console.warn('CORS blocked:', origin);
       callback(new Error('CORS policy: origin not allowed'));
     }
   },
@@ -1054,8 +1062,7 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     console.error('Fix CV error:', error);
     res.status(500).json({ 
       error: 'Failed to fix CV',
-      details: error.message,
-      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+      ...(process.env.NODE_ENV !== 'production' && { details: error.message })
     });
   }
 });
@@ -1105,11 +1112,72 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
   }
 });
 
+// Whop Webhook signature verification
+function verifyWhopWebhook(req) {
+  const signature = req.headers['x-whop-signature'];
+  const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
+
+  // Secret yoksa production'da reddet
+  if (!webhookSecret || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Webhook secret not configured');
+    }
+    console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - verification skipped');
+    return;
+  }
+
+  if (!signature) {
+    throw new Error('Missing x-whop-signature header');
+  }
+
+  // Parse t=timestamp,v1=signature format (Whop uses this)
+  const parts = signature.split(',');
+  let timestamp = '';
+  let sigValue = '';
+
+  for (const part of parts) {
+    if (part.startsWith('t=')) {
+      timestamp = part.slice(2);
+    } else if (part.startsWith('v1=')) {
+      sigValue = part.slice(3);
+    }
+  }
+
+  if (!timestamp || !sigValue) {
+    throw new Error('Invalid signature format');
+  }
+
+  // Get raw body
+  const rawBody = req.rawBody || req.body;
+  const bodyStr = Buffer.isBuffer(rawBody) ? rawBody.toString() : (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody));
+
+  // Compute expected signature: HMAC(timestamp.body)
+  const signedPayload = timestamp + '.' + bodyStr;
+  const expectedSignature = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(signedPayload)
+    .digest('hex');
+
+  const sigBuffer = Buffer.from(sigValue, 'utf8');
+  const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+
+  if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+    throw new Error('Invalid webhook signature');
+  }
+}
+
+// Store raw body for webhook
+app.use('/api/whop-webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
+  req.rawBody = req.body;
+  next();
+});
+
 // Webhook: Whop ödeme başarılı olduğunda çalışır
-app.post('/api/whop-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+app.post('/api/whop-webhook', async (req, res) => {
   try {
-    // TODO: Webhook signature verification eklenmeli (production'da)
-    // Şimdilik signature doğrulama atlanıyor
+    // Signature doğrulama
+    verifyWhopWebhook(req);
+
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     // Ödeme başarılı — kullanıcıya erişim ver
@@ -1172,8 +1240,6 @@ app.post('/api/whop-webhook', express.raw({ type: 'application/json' }), async (
     res.status(400).json({ error: 'Webhook processing failed' });
   }
 });
-
-// Debug endpoint (sadece development'ta)
 
 // PDF Download — convert CV text to professional PDF
 app.post('/api/download-pdf', rateLimit, async (req, res) => {
