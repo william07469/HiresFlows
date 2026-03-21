@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +11,7 @@
       padding: 0;
       box-sizing: border-box;
     }
-    
+
     body {
       font-family: 'DM Sans', sans-serif;
       background: #0a0a0a;
@@ -20,7 +21,7 @@
       align-items: center;
       justify-content: center;
     }
-    
+
     .login-container {
       max-width: 400px;
       width: 90%;
@@ -29,30 +30,30 @@
       border-radius: 16px;
       border: 1px solid #222;
     }
-    
+
     .logo {
       text-align: center;
       margin-bottom: 30px;
     }
-    
+
     .logo img {
       width: 120px;
     }
-    
+
     h1 {
       font-size: 24px;
       font-weight: 700;
       margin-bottom: 8px;
       text-align: center;
     }
-    
+
     .subtitle {
       color: #888;
       text-align: center;
       margin-bottom: 30px;
       font-size: 14px;
     }
-    
+
     .whop-button {
       display: block;
       width: 100%;
@@ -72,16 +73,16 @@
       justify-content: center;
       gap: 12px;
     }
-    
+
     .whop-button:hover {
       background: #4f46e5;
     }
-    
+
     .whop-button img {
       width: 24px;
       height: 24px;
     }
-    
+
     .divider {
       display: flex;
       align-items: center;
@@ -89,7 +90,7 @@
       color: #666;
       font-size: 12px;
     }
-    
+
     .divider::before,
     .divider::after {
       content: '';
@@ -97,28 +98,28 @@
       height: 1px;
       background: #333;
     }
-    
+
     .divider span {
       padding: 0 12px;
     }
-    
+
     .features {
       margin-top: 30px;
       padding-top: 30px;
       border-top: 1px solid #222;
     }
-    
+
     .features h3 {
       font-size: 14px;
       color: #888;
       margin-bottom: 16px;
       text-align: center;
     }
-    
+
     .features ul {
       list-style: none;
     }
-    
+
     .features li {
       display: flex;
       align-items: center;
@@ -127,7 +128,7 @@
       font-size: 14px;
       color: #ccc;
     }
-    
+
     .features li::before {
       content: '✓';
       color: #10b981;
@@ -135,22 +136,23 @@
     }
   </style>
 </head>
+
 <body>
   <div class="login-container">
     <div class="logo">
       <a href="/">
-        <img src="/logo.png" alt="HiresFlows">
+        <img src="/Adsız tasarım (2).png" alt="HiresFlows">
       </a>
     </div>
-    
+
     <h1>Welcome back</h1>
     <p class="subtitle">Sign in to continue optimizing your CV</p>
-    
+
     <a href="/api/auth/whop" class="whop-button">
       <img src="https://whop.com/favicon.ico" alt="Whop">
       Sign in with Whop
     </a>
-    
+
     <div class="features">
       <h3>What you get:</h3>
       <ul>
@@ -162,4 +164,5 @@
     </div>
   </div>
 </body>
+
 </html>
