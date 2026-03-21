@@ -821,10 +821,9 @@ app.post('/api/generate-cover-letter', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
     const user = getUser(userId);
-    // TEMPORARY: Credit check disabled for testing
-    // if (user.freeUsesLeft <= 0) {
-    //   return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
-    // }
+    if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
+      return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
+    }
 
     const { cvText, jdText, companyName, roleName } = req.body;
     if (!cvText || !jdText) return res.status(400).json({ error: 'CV and job description required' });
@@ -871,30 +870,29 @@ OUTPUT JSON:
     const clean = rawText.replace(/```json|```/g, '').replace(/^[^{]*/, '').replace(/[^}]*$/, '').trim();
     const jsonData = JSON.parse(clean);
 
-    // TEMPORARY: Credit deduction disabled for testing
-    // if (user.plan !== 'pro') {
-    //   user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
-    // }
+    // Kredi düş
+    if (user.plan !== 'pro') {
+      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    }
     user.totalFixes++;
     saveUsers();
     incrementFixes();
 
-    res.json({ ...jsonData, creditsLeft: 999 }); // Show unlimited credits
+    res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
     console.error('Cover letter error:', error.message);
     res.status(500).json({ error: 'Failed to generate cover letter' });
   }
 });
 
-// Interview Prep — paid feature (TEMPORARILY FREE FOR TESTING)
+// Interview Prep — paid feature
 app.post('/api/generate-interview-prep', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
     const user = getUser(userId);
-    // TEMPORARY: Credit check disabled for testing
-    // if (user.freeUsesLeft <= 0) {
-    //   return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
-    // }
+    if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
+      return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
+    }
 
     const { cvText, jdText, companyName, roleName } = req.body;
     if (!cvText || !jdText) return res.status(400).json({ error: 'CV and job description required' });
@@ -941,13 +939,13 @@ OUTPUT JSON:
     const clean = rawText.replace(/```json|```/g, '').replace(/^[^{]*/, '').replace(/[^}]*$/, '').trim();
     const jsonData = JSON.parse(clean);
 
-    // TEMPORARY: Credit deduction disabled for testing
-    // if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    // Kredi düş
+    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
     user.totalFixes++;
     saveUsers();
     incrementFixes();
 
-    res.json({ ...jsonData, creditsLeft: 999 }); // Show unlimited credits
+    res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
     console.error('Interview prep error:', error.message);
     res.status(500).json({ error: 'Failed to generate interview prep' });
@@ -1699,15 +1697,14 @@ app.get('/api/tracker/cv-versions', rateLimit, (req, res) => {
 // In-memory interview sessions (keyed by sessionId)
 const interviewSessions = new Map();
 
-// Start interview — generate questions from CV + JD (TEMPORARILY FREE FOR TESTING)
+// Start interview — generate questions from CV + JD
 app.post('/api/interview/start', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
     const user = getUser(userId);
-    // TEMPORARY: Credit check disabled for testing
-    // if (user.freeUsesLeft <= 0) {
-    //   return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
-    // }
+    if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
+      return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
+    }
 
     const { cvText, jdText, companyName, roleName, numQuestions } = req.body;
     if (!cvText || !jdText) return res.status(400).json({ error: 'CV and job description required' });
@@ -1857,8 +1854,8 @@ app.post('/api/interview/finish', rateLimit, async (req, res) => {
     const userId = session.userId;
     const user = getUser(userId);
 
-    // TEMPORARY: Credit deduction disabled for testing
-    // if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    // Kredi düş
+    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
     user.totalFixes++;
     saveUsers();
     incrementFixes();
