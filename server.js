@@ -59,6 +59,70 @@ function incrementFixes() {
 }
 
 // ═══════════════════════════════════════════════════════
+// MAGIC LINK AUTHENTICATION
+// ═══════════════════════════════════════════════════════
+const TOKENS_FILE = path.join(__dirname, 'magic-tokens.json');
+const TOKEN_EXPIRY_MS = 15 * 60 * 1000; // 15 dakika
+
+function loadTokens() {
+  try {
+    if (fs.existsSync(TOKENS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
+      // Expired tokenları temizle
+      const now = Date.now();
+      const clean = {};
+      for (const [token, info] of Object.entries(data)) {
+        if (info.expiresAt > now) {
+          clean[token] = info;
+        }
+      }
+      return clean;
+    }
+  } catch (e) { /* ignore */ }
+  return {};
+}
+
+function saveTokens() {
+  try {
+    const tmp = TOKENS_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(magicTokens, null, 2), 'utf8');
+    fs.renameSync(tmp, TOKENS_FILE);
+  } catch (e) { /* ignore */ }
+}
+
+let magicTokens = loadTokens();
+
+function generateMagicToken(email) {
+  const token = crypto.randomBytes(32).toString('hex');
+  magicTokens[token] = {
+    email: email.toLowerCase().trim(),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + TOKEN_EXPIRY_MS
+  };
+  saveTokens();
+  return token;
+}
+
+function verifyMagicToken(token) {
+  const tokenInfo = magicTokens[token];
+  if (!tokenInfo) return null;
+  if (tokenInfo.expiresAt < Date.now()) {
+    delete magicTokens[token];
+    saveTokens();
+    return null;
+  }
+  // Kullanıldıktan sonra sil (one-time use)
+  delete magicTokens[token];
+  saveTokens();
+  return tokenInfo.email;
+}
+
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+// ═══════════════════════════════════════════════════════
 // APPLICATION TRACKER STORE
 // ═══════════════════════════════════════════════════════
 const APPS_FILE = path.join(__dirname, 'applications.json');
@@ -350,7 +414,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '1mb' }));
 
 // ⚠️ Security: sadece belirli dosyaları serve et (.env, .cjs, server.js gibi dosyalar açığa çıkmaz)
-const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png'];
+const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'login.html', 'auth-callback.html'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const reqPath = req.path === '/' ? '/index.html' : req.path;
@@ -450,6 +514,103 @@ app.get('/api/plans', (req, res) => {
       { id: 'starter', name: 'Starter', price: 9, fixes: 5, description: '5 CV fixes, one-time' },
       { id: 'pro', name: 'Pro', price: 19, fixes: Infinity, description: 'Unlimited CV fixes, per month' }
     ]
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+// ROUTES: Magic Link Authentication
+// ═══════════════════════════════════════════════════════
+
+// Magic link gönder
+app.post('/api/auth/login', rateLimit, async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email || !validateEmail(email)) {
+      return res.status(400).json({ error: 'Valid email required' });
+    }
+
+    const token = generateMagicToken(email);
+    const baseUrl = process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app';
+    const magicLink = `${baseUrl}/auth/callback?token=${token}`;
+
+    // Email gönderme (production'da SMTP veya email servisi kullan)
+    // Şimdilik console'a yazdır
+    console.log(`\n📧 Magic Link for ${email}:`);
+    console.log(`   ${magicLink}\n`);
+
+    // TODO: Gerçek email gönderimi
+    // await sendEmail(email, 'Your Login Link', `
+    //   Click here to login: ${magicLink}
+    //   This link expires in 15 minutes.
+    // `);
+
+    res.json({
+      success: true,
+      message: 'Check your email for login link',
+      // Development'ta linki göster
+      ...(process.env.NODE_ENV !== 'production' && { debugLink: magicLink })
+    });
+  } catch (error) {
+    console.error('Login error:', error.message);
+    res.status(500).json({ error: 'Failed to send login link' });
+  }
+});
+
+// Magic link doğrula
+app.post('/api/auth/verify', rateLimit, async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Token required' });
+    }
+
+    const email = verifyMagicToken(token);
+    
+    if (!email) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    // Email ile kullanıcı bul veya oluştur
+    const userId = 'email_' + crypto.createHash('sha256').update(email).digest('hex').slice(0, 16);
+    const user = getUser(userId);
+    
+    // Session ID oluştur
+    const sessionId = crypto.randomUUID();
+    
+    res.json({
+      success: true,
+      email,
+      userId,
+      sessionId,
+      plan: user.plan,
+      freeUsesLeft: user.freeUsesLeft,
+      totalFixes: user.totalFixes
+    });
+  } catch (error) {
+    console.error('Verify error:', error.message);
+    res.status(500).json({ error: 'Verification failed' });
+  }
+});
+
+// Kullanıcı oturum durumu
+app.get('/api/auth/session', rateLimit, (req, res) => {
+  const sessionId = req.headers['x-session-id'];
+  if (!sessionId) {
+    return res.json({ authenticated: false });
+  }
+  
+  // Session'dan email bul
+  // (Basit implementasyon - production'da Redis veya DB kullan)
+  const userId = getUserId(req);
+  const user = getUser(userId);
+  
+  res.json({
+    authenticated: true,
+    userId,
+    plan: user.plan,
+    freeUsesLeft: user.freeUsesLeft
   });
 });
 
