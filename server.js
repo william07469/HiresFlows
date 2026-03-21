@@ -516,55 +516,9 @@ app.get('/api/plans', (req, res) => {
     ]
   });
 });
-
 // ═══════════════════════════════════════════════════════
-// ROUTES: Magic Link Authentication
+// ROUTES: User Status & Auth
 // ═══════════════════════════════════════════════════════
-
-// Magic link gönder
-app.post('/api/auth/login', rateLimit, async (req, res) => {
-  try {
-    const { email } = req.body;
-    
-    if (!email || !validateEmail(email)) {
-      return res.status(400).json({ error: 'Valid email required' });
-    }
-
-    const token = generateMagicToken(email);
-    const baseUrl = process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app';
-    const magicLink = `${baseUrl}/auth/callback?token=${token}`;
-
-    // Email gönderme (production'da SMTP veya email servisi kullan)
-    // Şimdilik console'a yazdır
-    console.log(`\n📧 Magic Link for ${email}:`);
-    console.log(`   ${magicLink}\n`);
-
-    // TODO: Gerçek email gönderimi
-    // await sendEmail(email, 'Your Login Link', `
-    //   Click here to login: ${magicLink}
-    //   This link expires in 15 minutes.
-    // `);
-
-    res.json({
-      success: true,
-      message: 'Check your email for login link',
-      // Development'ta linki göster
-      ...(process.env.NODE_ENV !== 'production' && { debugLink: magicLink })
-    });
-  } catch (error) {
-    console.error('Login error:', error.message);
-    res.status(500).json({ error: 'Failed to send login link' });
-  }
-});
-
-// Magic link doğrula
-app.post('/api/auth/verify', rateLimit, async (req, res) => {
-  try {
-    const { token } = req.body;
-    
-    if (!token) {
-      return res.status(400).json({ error: 'Token required' });
-    }
 
     const email = verifyMagicToken(token);
     
@@ -615,67 +569,33 @@ app.get('/api/auth/session', rateLimit, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════
-// ROUTES: Whop OAuth (Basit versiyon)
+// ROUTES: Simple Auth (Email-based)
 // ═══════════════════════════════════════════════════════
 
-// Whop OAuth - Redirect to Whop login
-app.get('/api/auth/whop', (req, res) => {
-  const appId = process.env.WHOP_APP_ID;
-  const baseUrl = process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app';
-  const redirectUri = `${baseUrl}/api/auth/whop/callback`;
-  
-  // Whop OAuth URL
-  const whopAuthUrl = `https://whop.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-  
-  res.redirect(whopAuthUrl);
+// Simple email login - frontend handles session creation
+app.get('/api/auth/login', (req, res) => {
+  // Redirect to login page
+  res.redirect('/login.html');
 });
 
-// Whop OAuth Callback - Basit versiyon
-app.get('/api/auth/whop/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
-    
-    if (!code) {
-      return res.redirect('/login.html?error=no_code');
-    }
+// Auth callback - just redirect to main page
+app.get('/api/auth/callback', (req, res) => {
+  res.redirect('/');
+});
 
-    // Token exchange
-    const tokenResponse = await fetch('https://api.whop.com/api/v5/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: process.env.WHOP_APP_ID,
-        client_secret: process.env.WHOP_API_KEY,
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: `${process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app'}/api/auth/whop/callback`
-      })
-    });
-
-    const tokenData = await tokenResponse.json();
-    
-    if (!tokenData.access_token) {
-      console.error('Token exchange failed:', tokenData);
-      return res.redirect('/login.html?error=token_failed');
-    }
-
-    // User info al
-    const userResponse = await fetch('https://api.whop.com/api/v5/me', {
-      headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
-    });
-
-    const userData = await userResponse.json();
-    
-    // Session oluştur
-    const userId = 'whop_' + (userData.id || Date.now());
-    const sessionId = crypto.randomUUID();
-    
-    // Callback sayfasına yönlendir
-    res.redirect(`/auth-callback.html?token=${sessionId}&userId=${userId}`);
-  } catch (error) {
-    console.error('Whop OAuth error:', error.message);
-    res.redirect('/login.html?error=oauth_failed');
-  }
+// Session check endpoint
+app.get('/api/auth/session', rateLimit, (req, res) => {
+  const sessionId = req.headers['x-session-id'];
+  const userId = getUserId(req);
+  const user = getUser(userId);
+  
+  res.json({
+    authenticated: !!sessionId,
+    userId,
+    email: req.headers['x-user-email'] || null,
+    plan: user.plan,
+    freeUsesLeft: user.freeUsesLeft
+  });
 });
 
 // Gerçek sayaç

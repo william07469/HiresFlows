@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Verifying... - HiresFlows</title>
+  <title>Welcome - HiresFlows</title>
   <style>
     * {
       margin: 0;
@@ -34,6 +34,7 @@
     h1 {
       font-size: 24px;
       margin-bottom: 16px;
+      color: #10b981;
     }
     
     .status {
@@ -41,19 +42,11 @@
       color: #888;
     }
     
-    .status.success {
-      color: #10b981;
-    }
-    
-    .status.error {
-      color: #ef4444;
-    }
-    
     .spinner {
       width: 40px;
       height: 40px;
       border: 3px solid #333;
-      border-top-color: #4f46e5;
+      border-top-color: #6366f1;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
       margin: 0 auto 20px;
@@ -62,22 +55,6 @@
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
-    }
-    
-    .btn {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 12px 24px;
-      background: #4f46e5;
-      color: #fff;
-      text-decoration: none;
-      border-radius: 8px;
-      font-weight: 600;
-      transition: background 0.3s;
-    }
-    
-    .btn:hover {
-      background: #4338ca;
     }
   </style>
 </head>
@@ -91,75 +68,33 @@
     
     <div id="status">
       <div class="spinner"></div>
-      <h1>Verifying your login...</h1>
-      <p class="status">Please wait...</p>
-    </div>
-    
-    <div id="error" style="display: none;">
-      <h1>Login failed</h1>
-      <p class="status error">Invalid or expired link</p>
-      <a href="/login.html" class="btn">Try again</a>
+      <h1>Welcome!</h1>
+      <p class="status">Redirecting to home...</p>
     </div>
   </div>
   
   <script>
-    const API_URL = window.location.origin;
+    // URL parametrelerini kontrol et
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const userId = urlParams.get('userId');
+    const email = urlParams.get('email');
     
-    async function verifyToken() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const token = urlParams.get('token');
-      
-      if (!token) {
-        showError('No token provided');
-        return;
-      }
-      
-      try {
-        const res = await fetch(`${API_URL}/api/auth/verify`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
-        });
-        
-        const data = await res.json();
-        
-        if (res.ok && data.success) {
-          // Session ID'yi localStorage'a kaydet
-          localStorage.setItem('sessionId', data.sessionId);
-          localStorage.setItem('userEmail', data.email);
-          localStorage.setItem('userId', data.userId);
-          
-          // Başarı mesajı göster
-          showSuccess(data.email);
-          
-          // 2 saniye sonra ana sayfaya yönlendir
-          setTimeout(() => {
-            window.location.href = '/';
-          }, 2000);
-        } else {
-          showError(data.error || 'Verification failed');
-        }
-      } catch (error) {
-        showError('Network error. Please try again.');
-      }
+    // Token varsa localStorage'a kaydet
+    if (token) {
+      localStorage.setItem('sessionId', token);
+    }
+    if (userId) {
+      localStorage.setItem('userId', userId);
+    }
+    if (email) {
+      localStorage.setItem('userEmail', email);
     }
     
-    function showSuccess(email) {
-      document.getElementById('status').innerHTML = `
-        <h1 style="color: #10b981;">✓ Login successful!</h1>
-        <p class="status success">Welcome back, ${email}</p>
-        <p class="status" style="margin-top: 10px;">Redirecting...</p>
-      `;
-    }
-    
-    function showError(message) {
-      document.getElementById('status').style.display = 'none';
-      document.getElementById('error').style.display = 'block';
-      document.getElementById('error').querySelector('.status').textContent = message;
-    }
-    
-    // Sayfa yüklenince doğrula
-    verifyToken();
+    // 2 saniye sonra ana sayfaya yönlendir
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 2000);
   </script>
 </body>
 </html>
