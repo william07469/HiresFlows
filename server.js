@@ -624,8 +624,9 @@ app.get('/api/auth/whop', (req, res) => {
   const baseUrl = process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app';
   const redirectUri = `${baseUrl}/api/auth/whop/callback`;
   
-  // Whop OAuth URL
-  const whopAuthUrl = `https://whop.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=read_user`;
+  // Gerekli izinler: kullanıcı bilgileri, üyelikler, ödemeler
+  const scopes = ['read_user', 'read_memberships', 'read_payments'].join(' ');
+  const whopAuthUrl = `https://whop.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes)}`;
   
   res.redirect(whopAuthUrl);
 });
