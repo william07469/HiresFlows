@@ -315,11 +315,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow all origins in production for now
-    // TODO: Restrict to specific domains
-    callback(null, true);
-  },
+  origin: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-whop-user-id'],
   maxAge: 86400
