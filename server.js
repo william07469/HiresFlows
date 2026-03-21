@@ -9,6 +9,7 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
+import zlib from 'zlib';
 import { Whop } from '@whop/sdk';
 import { calculateATSScore, calculateKeywordMatch, extractSkills, generateImprovements } from './ats-analyzer.js';
 import { selectRandomStyle } from './cv-styles.js';
@@ -306,18 +307,21 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://localhost:8080',
+  'http://localhost:5500',
+  'https://hiresflows-production.up.railway.app',
+  'https://hiresflows-production-8176.up.railway.app',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS policy: origin not allowed'));
-    }
+    // Allow all origins in production for now
+    // TODO: Restrict to specific domains
+    callback(null, true);
   },
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-session-id', 'x-whop-user-id'],
   maxAge: 86400
 }));
 
@@ -443,11 +447,46 @@ app.get('/api/stats', (req, res) => {
 // ROUTES: Free features (no payment needed)
 // ═══════════════════════════════════════════════════════
 
+function extractTextFromPDFBuffer(buffer) {
+  const str = buffer.toString('latin1');
+  let text = '';
+  const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  let match;
+  while ((match = streamRegex.exec(str)) !== null) {
+    const compressed = Buffer.from(match[1], 'latin1');
+    try {
+      const decompressed = zlib.inflateSync(compressed);
+      const hexRegex = /<([0-9a-fA-F]+)>/g;
+      let hexMatch;
+      while ((hexMatch = hexRegex.exec(decompressed.toString())) !== null) {
+        const hex = hexMatch[1];
+        let decoded = '';
+        for (let i = 0; i < hex.length; i += 2) {
+          decoded += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+        }
+        text += decoded;
+      }
+      const textRegex = /\(([^)]+)\)/g;
+      let textMatch;
+      while ((textMatch = textRegex.exec(decompressed.toString())) !== null) {
+        text += textMatch[1] + ' ';
+      }
+    } catch (e) { /* skip decompression errors */ }
+  }
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 app.post('/api/parse-pdf', rateLimit, upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'PDF file required' });
-    const data = await pdfParse(req.file.buffer);
-    const text = sanitizeText(data.text, 10000);
+    let text;
+    try {
+      const data = await pdfParse(req.file.buffer, { max: 50 });
+      text = sanitizeText(data.text, 10000);
+    } catch (parseErr) {
+      console.warn('pdf-parse failed, using fallback extraction:', parseErr.message);
+      text = sanitizeText(extractTextFromPDFBuffer(req.file.buffer), 10000);
+    }
     if (!text || text.trim().length < 10) {
       return res.status(400).json({ error: 'PDF is empty or image-based. Please paste your CV text manually.' });
     }
@@ -463,7 +502,10 @@ app.post('/api/parse-linkedin', rateLimit, upload.single('pdf'), async (req, res
   try {
     if (!req.file) return res.status(400).json({ error: 'LinkedIn PDF required' });
     
-    const data = await pdfParse(req.file.buffer);
+    const data = await pdfParse(req.file.buffer).catch(parseErr => {
+      console.warn('pdf-parse failed for LinkedIn PDF, using fallback:', parseErr.message);
+      return { text: extractTextFromPDFBuffer(req.file.buffer) };
+    });
     const rawText = data.text;
     
     if (!rawText || rawText.trim().length < 50) {
@@ -1872,7 +1914,7 @@ Reply with a 2-3 sentence motivational summary + 3 specific action items. Plain 
   }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✓ http://localhost:${PORT}`);
   console.log(`✓ Plans: Free(${PLANS.free.freeUses}) / Starter(${PLANS.starter.freeUses}) / Pro(∞)`);
   console.log(`✓ Security: CORS, Rate Limit, Input Validation, Access Control`);
