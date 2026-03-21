@@ -17,10 +17,14 @@ import { StorageService } from './src/job-tracker/storage-service.js';
 import { ApplicationTracker } from './src/job-tracker/application-tracker.js';
 import { CVVersionManager } from './src/job-tracker/cv-version-manager.js';
 import { PerformanceAnalyzer } from './src/job-tracker/performance-analyzer.js';
+import { initDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions } from './src/db/database.js';
 
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Veritabanını başlat
+initDatabase();
 
 const whop = new Whop({
   apiKey: process.env.WHOP_API_KEY || ''
@@ -32,32 +36,6 @@ const PORT = process.env.PORT || 3001;
 // ═══════════════════════════════════════════════════════
 // STATS COUNTER (real, persisted)
 // ═══════════════════════════════════════════════════════
-const STATS_FILE = path.join(__dirname, 'stats.json');
-
-function loadStats() {
-  try {
-    if (fs.existsSync(STATS_FILE)) {
-      return JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
-    }
-  } catch (e) { /* ignore */ }
-  return { totalFixes: 0, totalUsers: 0 };
-}
-
-function saveStats() {
-  try {
-    const tmp = STATS_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(stats), 'utf8');
-    fs.renameSync(tmp, STATS_FILE);
-  } catch (e) { /* ignore */ }
-}
-
-let stats = loadStats();
-
-function incrementFixes() {
-  stats.totalFixes++;
-  saveStats();
-}
-
 // ═══════════════════════════════════════════════════════
 // MAGIC LINK AUTHENTICATION
 // ═══════════════════════════════════════════════════════
@@ -199,29 +177,6 @@ function getUserCvVersions(userId) {
   return apps._cvVersions[userId];
 }
 
-function addCvVersion(userId, data) {
-  if (!apps._cvVersions) apps._cvVersions = {};
-  if (!apps._cvVersions[userId]) apps._cvVersions[userId] = [];
-  const versions = apps._cvVersions[userId];
-  const vNum = versions.length + 1;
-  
-  // NaN safety for scores
-  const scoreBefore = (typeof data.scoreBefore === 'number' && !isNaN(data.scoreBefore)) ? data.scoreBefore : 0;
-  const scoreAfter = (typeof data.scoreAfter === 'number' && !isNaN(data.scoreAfter)) ? data.scoreAfter : 0;
-  
-  const version = {
-    version: 'v' + vNum,
-    date: new Date().toISOString().slice(0, 10),
-    scoreBefore,
-    scoreAfter,
-    style: data.style || 'Standard',
-    createdAt: Date.now()
-  };
-  versions.push(version);
-  saveApps();
-  return version;
-}
-
 // AI MODEL FALLBACK with timeout
 // ═══════════════════════════════════════════════════════
 const AI_MODELS = [
@@ -268,35 +223,8 @@ async function generateWithFallback(apiKey, prompt, modelList = AI_MODELS) {
 }
 
 // ═══════════════════════════════════════════════════════
-// USER & ACCESS STORE (JSON file persistence)
+// USER & ACCESS STORE (SQLite Database)
 // ═══════════════════════════════════════════════════════
-const DATA_FILE = path.join(__dirname, 'users.json');
-
-function loadUsers() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const raw = fs.readFileSync(DATA_FILE, 'utf8');
-      const data = JSON.parse(raw);
-      return new Map(Object.entries(data));
-    }
-  } catch (e) {
-    console.error('Failed to load users.json:', e.message);
-  }
-  return new Map();
-}
-
-function saveUsers() {
-  try {
-    const obj = Object.fromEntries(users);
-    const tmp = DATA_FILE + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8');
-    fs.renameSync(tmp, DATA_FILE);
-  } catch (e) {
-    console.error('Failed to save users.json:', e.message);
-  }
-}
-
-const users = loadUsers();
 
 const PLANS = {
   free: { freeUses: 3, name: 'Free', price: 0 },
@@ -306,46 +234,15 @@ const PLANS = {
 
 // Her saat başı süresi dolmuş abonelikleri temizle
 setInterval(() => {
-  const now = Date.now();
-  let changed = false;
-  for (const [id, user] of users) {
-    if (user.plan === 'pro' && user.expiresAt && user.expiresAt < now) {
-      user.plan = 'free';
-      user.freeUsesLeft = 0;
-      changed = true;
-      console.log(`User ${id} subscription expired`);
-    }
-  }
-  if (changed) saveUsers();
+  cleanupExpiredSubscriptions();
+  console.log('Expired subscriptions cleaned up');
 }, 60 * 60 * 1000);
-
-function getUser(identifier) {
-  if (!users.has(identifier)) {
-    users.set(identifier, {
-      plan: 'free',
-      freeUsesLeft: PLANS.free.freeUses,
-      totalFixes: 0,
-      purchasedAt: null,
-      expiresAt: null
-    });
-    saveUsers();
-  }
-  return users.get(identifier);
-}
 
 function grantAccess(whopUserId, planType, metadata = {}) {
   const plan = PLANS[planType];
   if (!plan) return false;
 
-  const user = getUser(whopUserId);
-  user.plan = planType;
-  user.freeUsesLeft = plan.freeUses;
-  user.purchasedAt = Date.now();
-  if (plan.isSubscription) {
-    user.expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 gün
-  }
-  user.whopPaymentId = metadata.paymentId;
-  saveUsers();
+  updateUserPlan(whopUserId, planType, plan.isSubscription ? Date.now() + 30 * 24 * 60 * 60 * 1000 : null);
   console.log(`Access granted: ${whopUserId} → ${planType}`);
   return true;
 }
@@ -572,7 +469,8 @@ app.get('/api/auth/session', rateLimit, (req, res) => {
 
 // Gerçek sayaç
 app.get('/api/stats', (req, res) => {
-  res.json({ totalFixes: stats.totalFixes });
+  const dbStats = getGlobalStats();
+  res.json({ totalFixes: dbStats.totalFixes });
 });
 
 // ═══════════════════════════════════════════════════════
@@ -997,11 +895,10 @@ OUTPUT JSON:
 
     // Kredi düş
     if (user.plan !== 'pro') {
-      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+      decrementUserCredits(userId);
     }
-    user.totalFixes++;
-    saveUsers();
-    incrementFixes();
+    incrementUserFixes(userId);
+    incrementGlobalFixes();
 
     res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
@@ -1065,10 +962,9 @@ OUTPUT JSON:
     const jsonData = JSON.parse(clean);
 
     // Kredi düş
-    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
-    user.totalFixes++;
-    saveUsers();
-    incrementFixes();
+    if (user.plan !== 'pro') decrementUserCredits(userId);
+    incrementUserFixes(userId);
+    incrementGlobalFixes();
 
     res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
@@ -1158,10 +1054,9 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     }
 
     // Kredi düş
-    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
-    user.totalFixes++;
-    saveUsers();
-    incrementFixes();
+    if (user.plan !== 'pro') decrementUserCredits(userId);
+    incrementUserFixes(userId);
+    incrementGlobalFixes();
 
     // CV versiyonunu otomatik kaydet
     const cvVer = addCvVersion(userId, {
@@ -1320,14 +1215,10 @@ app.post('/api/whop-webhook', async (req, res) => {
       const data = event.data;
       const metadata = data.metadata || {};
       const userId = metadata.userId || data.user_id;
-      if (userId && users.has(userId)) {
-        const user = users.get(userId);
-        user.plan = 'pro';
-        user.freeUsesLeft = Infinity;
-        // Extend from current expiry if future, otherwise from now
-        const base = user.expiresAt && user.expiresAt > Date.now() ? user.expiresAt : Date.now();
-        user.expiresAt = base + 30 * 24 * 60 * 60 * 1000;
-        saveUsers();
+      if (userId) {
+        const user = getUser(userId);
+        const expiresAt = user.expiresAt && user.expiresAt > Date.now() ? user.expiresAt + 30 * 24 * 60 * 60 * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000;
+        updateUserPlan(userId, 'pro', expiresAt);
         console.log(`Subscription renewed: ${userId}`);
       }
     }
@@ -1337,11 +1228,8 @@ app.post('/api/whop-webhook', async (req, res) => {
       const data = event.data;
       const metadata = data.metadata || {};
       const userId = metadata.userId;
-      if (userId && users.has(userId)) {
-        const user = users.get(userId);
-        user.plan = 'free';
-        user.freeUsesLeft = 0;
-        saveUsers();
+      if (userId) {
+        updateUserPlan(userId, 'free', null);
         console.log(`Subscription cancelled: ${userId}`);
       }
     }
@@ -1416,11 +1304,8 @@ if (process.env.NODE_ENV !== 'production') {
     if (providedKey !== DEBUG_API_KEY) {
       return res.status(401).json({ error: 'Invalid debug key' });
     }
-    const allUsers = {};
-    for (const [id, user] of users) {
-      allUsers[id] = { ...user };
-    }
-    res.json({ count: users.size, users: allUsers });
+    const allUsers = getAllUsers();
+    res.json({ count: allUsers.length, users: allUsers });
   });
 }
 
@@ -2042,10 +1927,9 @@ app.post('/api/interview/finish', rateLimit, async (req, res) => {
     const user = getUser(userId);
 
     // Kredi düş
-    if (user.plan !== 'pro') user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
-    user.totalFixes++;
-    saveUsers();
-    incrementFixes();
+    if (user.plan !== 'pro') decrementUserCredits(userId);
+    incrementUserFixes(userId);
+    incrementGlobalFixes();
 
     // Calculate summary
     const answers = session.answers;
