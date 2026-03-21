@@ -520,34 +520,6 @@ app.get('/api/plans', (req, res) => {
 // ROUTES: User Status & Auth
 // ═══════════════════════════════════════════════════════
 
-    const email = verifyMagicToken(token);
-    
-    if (!email) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
-    // Email ile kullanıcı bul veya oluştur
-    const userId = 'email_' + crypto.createHash('sha256').update(email).digest('hex').slice(0, 16);
-    const user = getUser(userId);
-    
-    // Session ID oluştur
-    const sessionId = crypto.randomUUID();
-    
-    res.json({
-      success: true,
-      email,
-      userId,
-      sessionId,
-      plan: user.plan,
-      freeUsesLeft: user.freeUsesLeft,
-      totalFixes: user.totalFixes
-    });
-  } catch (error) {
-    console.error('Verify error:', error.message);
-    res.status(500).json({ error: 'Verification failed' });
-  }
-});
-
 // Kullanıcı oturum durumu
 app.get('/api/auth/session', rateLimit, (req, res) => {
   const sessionId = req.headers['x-session-id'];
