@@ -1,67 +1,91 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, '..', '..', 'hiresflows.db');
+// Railway'de /tmp dizinini kullan (persist için)
+const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', '..', 'hiresflows.db');
 
 let db;
 
 export function initDatabase() {
-  db = new Database(DB_PATH);
-  
-  // WAL mode - daha hızlı
-  db.pragma('journal_mode = WAL');
-  
-  // Kullanıcılar tablosu
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      plan TEXT DEFAULT 'free',
-      free_uses_left INTEGER DEFAULT 3,
-      total_fixes INTEGER DEFAULT 0,
-      purchased_at INTEGER,
-      expires_at INTEGER,
-      created_at INTEGER DEFAULT (unixepoch()),
-      updated_at INTEGER DEFAULT (unixepoch())
-    )
-  `);
-  
-  // Fix geçmişi tablosu
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS fixes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT,
-      score_before INTEGER,
-      score_after INTEGER,
-      style TEXT,
-      created_at INTEGER DEFAULT (unixepoch()),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `);
-  
-  // CV versiyonları tablosu
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS cv_versions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id TEXT,
-      version INTEGER,
-      score_before INTEGER,
-      score_after INTEGER,
-      style TEXT,
-      created_at INTEGER DEFAULT (unixepoch()),
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `);
-  
-  console.log('✓ Database initialized');
-  return db;
+  try {
+    // Dizini oluştur
+    const dbDir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+    
+    db = new Database(DB_PATH);
+    
+    // WAL mode - daha hızlı
+    db.pragma('journal_mode = WAL');
+    
+    // Kullanıcılar tablosu
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        email TEXT UNIQUE,
+        plan TEXT DEFAULT 'free',
+        free_uses_left INTEGER DEFAULT 3,
+        total_fixes INTEGER DEFAULT 0,
+        purchased_at INTEGER,
+        expires_at INTEGER,
+        created_at INTEGER DEFAULT (unixepoch()),
+        updated_at INTEGER DEFAULT (unixepoch())
+      )
+    `);
+    
+    // Fix geçmişi tablosu
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS fixes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        score_before INTEGER,
+        score_after INTEGER,
+        style TEXT,
+        created_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    
+    // CV versiyonları tablosu
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cv_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        version INTEGER,
+        score_before INTEGER,
+        score_after INTEGER,
+        style TEXT,
+        created_at INTEGER DEFAULT (unixepoch()),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    
+    // Stats tablosu
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS stats (
+        key TEXT PRIMARY KEY,
+        value INTEGER DEFAULT 0
+      )
+    `);
+    
+    console.log('✓ Database initialized at:', DB_PATH);
+  } catch (error) {
+    console.error('Database initialization failed:', error.message);
+    // Fallback to in-memory if database fails
+    db = null;
+  }
 }
 
 export function getDatabase() {
   if (!db) {
     initDatabase();
+  }
+  if (!db) {
+    throw new Error('Database not initialized');
   }
   return db;
 }
