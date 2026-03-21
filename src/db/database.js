@@ -279,3 +279,4 @@ export function cleanupExpiredSubscriptions() {
     WHERE plan = 'pro' AND expires_at < ?
   `).run(now);
 }
+// Trigger redeploy
