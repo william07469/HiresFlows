@@ -127,7 +127,7 @@ export function calculateATSScore(cvText, jdText = '') {
   
   // Soft skills (20%)
   const softWords = ['leadership', 'communication', 'teamwork', 'problem-solving', 'analytical', 'creative', 'collaborative', 'strategic', 'initiative', 'adaptability', 'time management', 'critical thinking'];
-  const softCount = softWords.filter(w => lowCV.includes(w)).length;
+  const softCount = softWords.filter(w => cv.includes(w)).length;
   score += Math.min(softCount * 2, 10);
   if (softCount < 3) {
     recommendations.push('Add more soft skills');

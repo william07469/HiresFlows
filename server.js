@@ -1051,8 +1051,12 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     res.json(jsonData);
 
   } catch (error) {
-    console.error('Fix CV error:', error.message);
-    res.status(500).json({ error: 'Failed to fix CV' });
+    console.error('Fix CV error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fix CV',
+      details: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
   }
 });
 
