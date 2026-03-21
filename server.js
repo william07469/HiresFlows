@@ -1098,24 +1098,12 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
       planType = 'starter';
     }
 
-    const checkoutConfig = await whop.checkoutSessions.create({
-      company_id: process.env.WHOP_COMPANY_ID,
-      plan: {
-        plan_type: planType === 'pro' ? 'recurring' : 'one_time',
-        initial_price: price,
-        recurring_interval: planType === 'pro' ? 'monthly' : undefined,
-        release_method: 'buy_now'
-      },
-      metadata: {
-        userId,
-        plan: planType,
-        service: 'cv-fixer'
-      }
-    });
+    // Whop checkout URL oluştur
+    const checkoutUrl = `https://whop.com/checkout/${planType === 'pro' ? 'pro' : 'starter'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
 
     res.json({
-      sessionId: checkoutConfig.id,
-      checkoutUrl: checkoutConfig.checkout_url
+      sessionId: 'temp_' + Date.now(),
+      checkoutUrl
     });
 
   } catch (error) {
