@@ -53,37 +53,11 @@
       font-size: 14px;
     }
     
-    .form-group {
-      margin-bottom: 20px;
-    }
-    
-    label {
+    .whop-button {
       display: block;
-      margin-bottom: 8px;
-      font-size: 14px;
-      color: #ccc;
-    }
-    
-    input[type="email"] {
       width: 100%;
-      padding: 14px 16px;
-      background: #1a1a1a;
-      border: 1px solid #333;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 16px;
-      outline: none;
-      transition: border-color 0.3s;
-    }
-    
-    input[type="email"]:focus {
-      border-color: #4f46e5;
-    }
-    
-    button {
-      width: 100%;
-      padding: 14px;
-      background: #4f46e5;
+      padding: 16px;
+      background: #6366f1;
       color: #fff;
       border: none;
       border-radius: 8px;
@@ -91,76 +65,73 @@
       font-weight: 600;
       cursor: pointer;
       transition: background 0.3s;
+      text-decoration: none;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
     }
     
-    button:hover {
-      background: #4338ca;
+    .whop-button:hover {
+      background: #4f46e5;
     }
     
-    button:disabled {
+    .whop-button img {
+      width: 24px;
+      height: 24px;
+    }
+    
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 24px 0;
+      color: #666;
+      font-size: 12px;
+    }
+    
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
       background: #333;
-      cursor: not-allowed;
     }
     
-    .message {
-      margin-top: 20px;
-      padding: 12px;
-      border-radius: 8px;
+    .divider span {
+      padding: 0 12px;
+    }
+    
+    .features {
+      margin-top: 30px;
+      padding-top: 30px;
+      border-top: 1px solid #222;
+    }
+    
+    .features h3 {
       font-size: 14px;
+      color: #888;
+      margin-bottom: 16px;
       text-align: center;
     }
     
-    .message.success {
-      background: #065f46;
-      border: 1px solid #059669;
+    .features ul {
+      list-style: none;
     }
     
-    .message.error {
-      background: #7f1d1d;
-      border: 1px solid #dc2626;
+    .features li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+      font-size: 14px;
+      color: #ccc;
     }
     
-    .debug-link {
-      margin-top: 15px;
-      padding: 12px;
-      background: #1f2937;
-      border-radius: 8px;
-      font-size: 12px;
-      word-break: break-all;
-    }
-    
-    .debug-link a {
-      color: #60a5fa;
-      text-decoration: none;
-    }
-    
-    .debug-link a:hover {
-      text-decoration: underline;
-    }
-    
-    .loading {
-      display: none;
-    }
-    
-    .loading.active {
-      display: inline-block;
-    }
-    
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid #fff;
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      display: inline-block;
-      margin-right: 8px;
-      vertical-align: middle;
+    .features li::before {
+      content: '✓';
+      color: #10b981;
+      font-weight: bold;
     }
   </style>
 </head>
@@ -173,101 +144,22 @@
     </div>
     
     <h1>Welcome back</h1>
-    <p class="subtitle">Enter your email to receive a login link</p>
+    <p class="subtitle">Sign in to continue optimizing your CV</p>
     
-    <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Email address</label>
-        <input 
-          type="email" 
-          id="email" 
-          name="email" 
-          placeholder="you@example.com"
-          required
-          autocomplete="email"
-        >
-      </div>
-      
-      <button type="submit" id="submitBtn">
-        <span class="loading" id="loading">
-          <span class="spinner"></span>
-        </span>
-        <span id="btnText">Send login link</span>
-      </button>
-    </form>
+    <a href="/api/auth/whop" class="whop-button">
+      <img src="https://whop.com/favicon.ico" alt="Whop">
+      Sign in with Whop
+    </a>
     
-    <div id="message"></div>
+    <div class="features">
+      <h3>What you get:</h3>
+      <ul>
+        <li>3 free CV optimizations</li>
+        <li>ATS keyword analysis</li>
+        <li>Interview prep tools</li>
+        <li>Cover letter generator</li>
+      </ul>
+    </div>
   </div>
-  
-  <script>
-    const API_URL = window.location.origin;
-    const form = document.getElementById('loginForm');
-    const emailInput = document.getElementById('email');
-    const submitBtn = document.getElementById('submitBtn');
-    const loading = document.getElementById('loading');
-    const btnText = document.getElementById('btnText');
-    const messageDiv = document.getElementById('message');
-    
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const email = emailInput.value.trim();
-      if (!email) return;
-      
-      // UI'ı güncelle
-      submitBtn.disabled = true;
-      loading.classList.add('active');
-      btnText.textContent = 'Sending...';
-      messageDiv.innerHTML = '';
-      
-      try {
-        const res = await fetch(`${API_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email })
-        });
-        
-        const data = await res.json();
-        
-        if (res.ok) {
-          messageDiv.innerHTML = `
-            <div class="message success">
-              <strong>Check your email!</strong><br>
-              We sent a login link to <strong>${email}</strong>
-            </div>
-          `;
-          
-          // Development'ta debug link göster
-          if (data.debugLink) {
-            messageDiv.innerHTML += `
-              <div class="debug-link">
-                <strong>Debug (dev only):</strong><br>
-                <a href="${data.debugLink}" target="_blank">${data.debugLink}</a>
-              </div>
-            `;
-          }
-          
-          // Form'u sıfırla
-          emailInput.value = '';
-        } else {
-          messageDiv.innerHTML = `
-            <div class="message error">
-              ${data.error || 'Failed to send login link'}
-            </div>
-          `;
-        }
-      } catch (error) {
-        messageDiv.innerHTML = `
-          <div class="message error">
-            Network error. Please try again.
-          </div>
-        `;
-      } finally {
-        submitBtn.disabled = false;
-        loading.classList.remove('active');
-        btnText.textContent = 'Send login link';
-      }
-    });
-  </script>
 </body>
 </html>
