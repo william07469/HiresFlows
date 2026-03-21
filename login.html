@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +10,7 @@
       padding: 0;
       box-sizing: border-box;
     }
-
+    
     body {
       font-family: 'DM Sans', sans-serif;
       background: #0a0a0a;
@@ -21,7 +20,7 @@
       align-items: center;
       justify-content: center;
     }
-
+    
     .login-container {
       max-width: 400px;
       width: 90%;
@@ -29,35 +28,36 @@
       background: #111;
       border-radius: 16px;
       border: 1px solid #222;
-    }
-
-    .logo {
       text-align: center;
+    }
+    
+    .logo {
       margin-bottom: 30px;
     }
-
+    
     .logo img {
       width: 120px;
     }
-
+    
     h1 {
       font-size: 24px;
       font-weight: 700;
       margin-bottom: 8px;
-      text-align: center;
     }
-
+    
     .subtitle {
       color: #888;
-      text-align: center;
       margin-bottom: 30px;
       font-size: 14px;
     }
-
-    .whop-button {
-      display: block;
+    
+    .whop-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
       width: 100%;
-      padding: 16px;
+      padding: 16px 24px;
       background: #6366f1;
       color: #fff;
       border: none;
@@ -67,92 +67,64 @@
       cursor: pointer;
       transition: background 0.3s;
       text-decoration: none;
-      text-align: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
     }
-
-    .whop-button:hover {
+    
+    .whop-btn:hover {
       background: #4f46e5;
     }
-
-    .whop-button img {
+    
+    .whop-btn svg {
       width: 24px;
       height: 24px;
     }
-
-    .divider {
-      display: flex;
-      align-items: center;
-      margin: 24px 0;
-      color: #666;
-      font-size: 12px;
-    }
-
-    .divider::before,
-    .divider::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: #333;
-    }
-
-    .divider span {
-      padding: 0 12px;
-    }
-
+    
     .features {
       margin-top: 30px;
       padding-top: 30px;
       border-top: 1px solid #222;
+      text-align: left;
     }
-
+    
     .features h3 {
       font-size: 14px;
       color: #888;
       margin-bottom: 16px;
-      text-align: center;
     }
-
+    
     .features ul {
       list-style: none;
     }
-
+    
     .features li {
-      display: flex;
-      align-items: center;
-      gap: 12px;
       padding: 8px 0;
       font-size: 14px;
       color: #ccc;
     }
-
+    
     .features li::before {
-      content: '✓';
+      content: '✓ ';
       color: #10b981;
-      font-weight: bold;
     }
   </style>
 </head>
-
 <body>
   <div class="login-container">
     <div class="logo">
       <a href="/">
-        <img src="/Adsız tasarım (2).png" alt="HiresFlows">
+        <img src="/logo.png" alt="HiresFlows">
       </a>
     </div>
-
-    <h1>Welcome back</h1>
-    <p class="subtitle">Sign in to continue optimizing your CV</p>
-
-    <a href="/api/auth/whop" class="whop-button">
-      <img src="https://whop.com/favicon.ico" alt="Whop">
+    
+    <h1>Welcome</h1>
+    <p class="subtitle">Sign in to optimize your CV</p>
+    
+    <a href="/api/auth/whop" class="whop-btn">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
       Sign in with Whop
     </a>
-
+    
     <div class="features">
       <h3>What you get:</h3>
       <ul>
@@ -164,5 +136,4 @@
     </div>
   </div>
 </body>
-
 </html>

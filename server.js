@@ -615,7 +615,7 @@ app.get('/api/auth/session', rateLimit, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════
-// ROUTES: Whop OAuth
+// ROUTES: Whop OAuth (Basit versiyon)
 // ═══════════════════════════════════════════════════════
 
 // Whop OAuth - Redirect to Whop login
@@ -624,30 +624,31 @@ app.get('/api/auth/whop', (req, res) => {
   const baseUrl = process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app';
   const redirectUri = `${baseUrl}/api/auth/whop/callback`;
   
-  // Whop OAuth URL - basit scope
-  const whopAuthUrl = `https://whop.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid+profile+email`;
+  // Whop OAuth URL
+  const whopAuthUrl = `https://whop.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
   
   res.redirect(whopAuthUrl);
 });
 
-// Whop OAuth Callback
+// Whop OAuth Callback - Basit versiyon
 app.get('/api/auth/whop/callback', async (req, res) => {
   try {
     const { code } = req.query;
     
     if (!code) {
-      return res.redirect('/login.html?error=auth_failed');
+      return res.redirect('/login.html?error=no_code');
     }
 
-    // Token exchange - Whop'dan access token al
-    const tokenResponse = await fetch('https://api.whop.com/api/v1/oauth/token', {
+    // Token exchange
+    const tokenResponse = await fetch('https://api.whop.com/api/v5/oauth/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         client_id: process.env.WHOP_APP_ID,
         client_secret: process.env.WHOP_API_KEY,
         code,
-        grant_type: 'authorization_code'
+        grant_type: 'authorization_code',
+        redirect_uri: `${process.env.FRONTEND_URL || 'https://hiresflows-production.up.railway.app'}/api/auth/whop/callback`
       })
     });
 
@@ -658,20 +659,19 @@ app.get('/api/auth/whop/callback', async (req, res) => {
       return res.redirect('/login.html?error=token_failed');
     }
 
-    // Kullanıcı bilgilerini al
-    const userResponse = await fetch('https://api.whop.com/api/v1/me', {
+    // User info al
+    const userResponse = await fetch('https://api.whop.com/api/v5/me', {
       headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
     });
 
     const userData = await userResponse.json();
     
     // Session oluştur
-    const userId = 'whop_' + (userData.id || userData.username);
-    const user = getUser(userId);
+    const userId = 'whop_' + (userData.id || Date.now());
     const sessionId = crypto.randomUUID();
     
     // Callback sayfasına yönlendir
-    res.redirect(`/auth-callback.html?token=${sessionId}&userId=${userId}&email=${encodeURIComponent(userData.email || '')}`);
+    res.redirect(`/auth-callback.html?token=${sessionId}&userId=${userId}`);
   } catch (error) {
     console.error('Whop OAuth error:', error.message);
     res.redirect('/login.html?error=oauth_failed');
