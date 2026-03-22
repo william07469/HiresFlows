@@ -457,6 +457,29 @@ app.get('/api/auth/callback', (req, res) => {
   res.redirect('/');
 });
 
+// İzin verilen email domain'leri (geçici email yasak)
+const ALLOWED_EMAIL_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'yahoo.co.uk', 'outlook.com', 'hotmail.com',
+  'live.com', 'msn.com', 'icloud.com', 'me.com', 'mac.com',
+  'aol.com', 'protonmail.com', 'proton.me', 'zoho.com', 'yandex.com',
+  'mail.com', 'gmx.com', 'gmx.net', 'fastmail.com', 'tutanota.com',
+  'hey.com', 'icloud.com', 'qq.com', '163.com', '126.com',
+  'naver.com', 'daum.net', 'kakao.com', 'web.de', 'arcor.de',
+  'tele2.de', 'freenet.de', 't-online.de', 'comcast.net', 'verizon.net',
+  'att.net', 'sbcglobal.net', 'cox.net', 'ntlworld.com', 'btinternet.com',
+  'virginmedia.com', 'blueyonder.co.uk', 'freeserve.co.uk', 'talktalk.co.uk',
+  'orange.fr', 'sfr.fr', 'free.fr', 'laposte.net', 'wanadoo.fr',
+  'alice.it', 'libero.it', 'virgilio.it', 'tim.it', 'tiscali.it',
+  'terra.es', 'telefonica.net', 'ono.com', 'prodigy.net.mx',
+  'rediffmail.com', 'sify.com', 'mail.ru', 'bk.ru', 'inbox.ru',
+  'ukr.net', 'i.ua', 'meta.ua', 'wp.pl', 'onet.pl', 'interia.pl'
+];
+
+function isValidEmailDomain(email) {
+  const domain = email.toLowerCase().trim().split('@')[1];
+  return ALLOWED_EMAIL_DOMAINS.includes(domain);
+}
+
 // Register endpoint
 app.post('/api/auth/register', rateLimit, async (req, res) => {
   try {
@@ -464,6 +487,11 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    // Email domain kontrolü
+    if (!isValidEmailDomain(email)) {
+      return res.status(400).json({ error: 'Please use a valid email provider (Gmail, Yahoo, Outlook, etc.)' });
     }
     
     if (password.length < 6) {
@@ -1200,7 +1228,7 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
     }
 
     // Whop checkout URL oluştur
-    const checkoutUrl = `${planType === 'pro' ? 'https://whop.com/checkout/plan_wHcvaWu8aDiyQ' : 'https://whop.com/checkout/plan_9Z94lJALdGHqK'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
+    const checkoutUrl = `${planType === 'pro' ? 'https://whop.com/checkout/plan_9Z94lJALdGHqK' : 'https://whop.com/checkout/plan_wHcvaWu8aDiyQ'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
 
     res.json({
       sessionId: 'temp_' + Date.now(),
