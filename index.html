@@ -2007,6 +2007,13 @@
       }
     }
   </style>
+  <script>
+    // Check if user is logged in (has email)
+    const _userEmail = localStorage.getItem('userEmail');
+    if (!_userEmail) {
+      window.location.href = '/login.html';
+    }
+  </script>
 </head>
 
 <body>
