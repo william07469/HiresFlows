@@ -2648,6 +2648,12 @@
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
         closePw();
+        // Reset paywall button state
+        var btn = document.querySelector('.btn-pw');
+        if (btn) {
+          btn.textContent = 'Get Access on Whop →';
+          btn.disabled = false;
+        }
         loadUserStatus();
       }
     });
