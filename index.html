@@ -2305,6 +2305,12 @@
     var _userCredits = 1;
     var _userPlan = 'free';
 
+    // Check if user is logged in (has email)
+    const _userEmail = localStorage.getItem('userEmail');
+    if (!_userEmail) {
+      window.location.href = '/login.html';
+    }
+
     // Persistent session ID (survives network changes, unlike IP)
     var _sessionId = localStorage.getItem('ghf_sid');
     if (!_sessionId) {
