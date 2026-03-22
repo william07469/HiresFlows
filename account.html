@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Account — HiresFlows</title>
+<meta name="description" content="Manage your HiresFlows account, view usage, and upgrade your plan.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#09090f;--s1:#0f0f18;--s2:#161622;--s3:#1e1e2d;
+  --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.1);--b3:rgba(255,255,255,.16);
+  --lime:#c8f545;--lime2:#a8d930;
+  --green:#4ff787;--rose:#f74f6a;--amber:#f7c24f;--sky:#4f8ef7;
+  --chalk:#eeeaf8;--chalk2:#a09cb8;--chalk3:#5a5672;
+  --r:8px;--r2:14px;--r3:20px;
+}
+body{background:var(--bg);color:var(--chalk);font-family:'Inter',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 50% -20%,rgba(200,245,69,.07) 0%,transparent 55%);pointer-events:none;z-index:0}
+
+/* Nav */
+.nav{display:flex;align-items:center;justify-content:space-between;padding:20px 40px;border-bottom:1px solid var(--b1);background:rgba(9,9,15,.85);backdrop-filter:blur(14px);position:sticky;top:0;z-index:100}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;text-decoration:none;color:var(--chalk)}
+.logo span{color:var(--lime)}
+.nav-right{display:flex;align-items:center;gap:16px}
+.btn-nav{font-size:13px;font-weight:600;padding:8px 20px;border-radius:var(--r2);background:var(--lime);border:none;color:var(--bg);cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;transition:all .25s}
+.btn-nav:hover{background:var(--lime2);transform:translateY(-1px)}
+.btn-nav-outline{background:transparent;border:1px solid var(--b3);color:var(--chalk)}
+.btn-nav-outline:hover{border-color:var(--rose);color:var(--rose)}
+.btn-signout{background:transparent;border:1px solid var(--rose);color:var(--rose)}
+.btn-signout:hover{background:var(--rose);color:var(--bg)}
+
+/* Container */
+.container{max-width:600px;margin:0 auto;padding:40px 24px}
+
+/* Cards */
+.card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--r3);padding:28px;margin-bottom:24px;transition:all .3s}
+.card:hover{border-color:rgba(200,245,69,.15)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.card-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+.card-badge{font-size:11px;padding:4px 12px;border-radius:20px;font-weight:600;letter-spacing:.5px}
+.badge-free{background:rgba(160,156,184,.15);color:var(--chalk2)}
+.badge-starter{background:rgba(247,194,79,.15);color:var(--amber)}
+.badge-pro{background:rgba(200,245,69,.15);color:var(--lime)}
+
+/* Profile Section */
+.profile{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.profile-avatar{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--lime),var(--green));display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--bg)}
+.profile-info h2{font-size:18px;font-weight:600;margin-bottom:4px}
+.profile-info p{font-size:13px;color:var(--chalk2)}
+
+/* Stats Grid */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:24px}
+.stat{background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);padding:16px;text-align:center;transition:all .3s}
+.stat:hover{border-color:rgba(200,245,69,.2);transform:translateY(-2px)}
+.stat-value{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--lime);margin-bottom:4px}
+.stat-label{font-size:11px;color:var(--chalk3);text-transform:uppercase;letter-spacing:.8px}
+
+/* Plan Info */
+.plan-info{display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r2);margin-bottom:16px}
+.plan-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+.plan-desc{font-size:12px;color:var(--chalk2);margin-top:4px}
+.plan-expiry{font-size:11px;color:var(--chalk3);margin-top:8px}
+
+/* Buttons */
+.btn-full{width:100%;padding:14px;border-radius:var(--r);font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;border:none;transition:all .3s}
+.btn-full-primary{background:var(--lime);color:var(--bg)}
+.btn-full-primary:hover{background:var(--lime2);transform:translateY(-2px);box-shadow:0 8px 25px rgba(200,245,69,.25)}
+.btn-full-outline{background:transparent;border:1px solid var(--b3);color:var(--chalk)}
+.btn-full-outline:hover{border-color:var(--lime);color:var(--lime)}
+.btn-full-danger{background:transparent;border:1px solid var(--rose);color:var(--rose)}
+.btn-full-danger:hover{background:var(--rose);color:var(--bg)}
+
+/* Usage Bar */
+.usage-bar{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;margin:12px 0}
+.usage-fill{height:100%;background:linear-gradient(90deg,var(--lime),var(--green));border-radius:4px;transition:width .5s ease}
+.usage-text{font-size:12px;color:var(--chalk2);text-align:center}
+
+/* Footer */
+footer{text-align:center;padding:40px 20px;border-top:1px solid var(--b1);margin-top:40px}
+footer a{color:var(--chalk3);text-decoration:none;font-size:12px;margin:0 12px;transition:color .3s}
+footer a:hover{color:var(--lime)}
+
+/* Responsive */
+@media(max-width:640px){
+  .nav{padding:14px 20px}
+  .container{padding:24px 16px}
+  .stats-grid{grid-template-columns:1fr}
+  .profile{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <a href="/" class="logo">Hires<span>Flows</span></a>
+  <div class="nav-right">
+    <a href="/" class="btn-nav-outline" style="text-decoration:none;font-size:13px;font-weight:600;padding:8px 20px;border-radius:14px;border:1px solid rgba(255,255,255,.16);color:var(--chalk);transition:all .25s">Home</a>
+    <button class="btn-signout" onclick="signOut()" style="font-size:13px;font-weight:600;padding:8px 20px;border-radius:14px;cursor:pointer;transition:all .25s">Sign Out</button>
+  </div>
+</nav>
+
+<div class="container">
+  <!-- Profile Card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Profile</div>
+    </div>
+    <div class="profile">
+      <div class="profile-avatar" id="avatar">?</div>
+      <div class="profile-info">
+        <h2 id="displayName">Loading...</h2>
+        <p id="displayEmail">—</p>
+        <p id="displayDate" style="font-size:11px;color:var(--chalk3);margin-top:4px">Member since —</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Plan Card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Your Plan</div>
+      <div class="card-badge" id="planBadge">Free</div>
+    </div>
+    <div class="plan-info">
+      <div>
+        <div class="plan-name" id="planName">Free Plan</div>
+        <div class="plan-desc" id="planDesc">3 free CV fixes</div>
+        <div class="plan-expiry" id="planExpiry"></div>
+      </div>
+    </div>
+    <div class="usage-bar">
+      <div class="usage-fill" id="usageFill" style="width:100%"></div>
+    </div>
+    <div class="usage-text" id="usageText">3 of 3 fixes remaining</div>
+    <button class="btn-full btn-full-primary" onclick="window.location.href='/#pricingSec'" style="margin-top:16px" id="upgradeBtn">Upgrade Plan →</button>
+  </div>
+
+  <!-- Stats Card -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Usage Statistics</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat">
+        <div class="stat-value" id="totalFixes">0</div>
+        <div class="stat-label">Total Fixes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="creditsLeft">0</div>
+        <div class="stat-label">Credits Left</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Danger Zone -->
+  <div class="card" style="border-color:rgba(247,79,106,.2)">
+    <div class="card-header">
+      <div class="card-title" style="color:var(--rose)">Account Actions</div>
+    </div>
+    <button class="btn-full btn-full-danger" onclick="signOut()">Sign Out</button>
+  </div>
+</div>
+
+<footer>
+  <a href="/">Home</a>
+  <a href="/pricing.html">Pricing</a>
+  <a href="/terms.html">Terms</a>
+  <a href="/privacy.html">Privacy</a>
+  <span style="color:var(--chalk3);font-size:12px">© 2026 HiresFlows</span>
+</footer>
+
+<script>
+// Cookie helper
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? match[2] : null;
+}
+
+// Session ID
+var sessionId = getCookie('hf_session') || localStorage.getItem('ghf_sid');
+var userEmail = getCookie('hf_user') || localStorage.getItem('userEmail');
+
+// Redirect if not logged in
+if (!userEmail) {
+  window.location.href = '/login.html';
+}
+
+function apiHeaders(extra) {
+  return Object.assign({ 'x-session-id': sessionId }, extra || {});
+}
+
+// Load account data
+async function loadAccount() {
+  try {
+    const res = await fetch('/api/me', { headers: apiHeaders() });
+    if (!res.ok) throw new Error('Failed to fetch account');
+    const data = await res.json();
+    
+    // Update profile
+    const email = userEmail || data.email || 'Unknown';
+    document.getElementById('displayEmail').textContent = email;
+    document.getElementById('displayName').textContent = email.split('@')[0];
+    document.getElementById('avatar').textContent = email.charAt(0).toUpperCase();
+    
+    // Update plan
+    const plan = data.plan || 'free';
+    const planNames = { free: 'Free Plan', starter: 'Starter Plan', pro: 'Pro Plan' };
+    const planDescs = { 
+      free: '3 free CV fixes', 
+      starter: '5 CV fixes (one-time)', 
+      pro: 'Unlimited CV fixes per month' 
+    };
+    const planBadgeClass = { free: 'badge-free', starter: 'badge-starter', pro: 'badge-pro' };
+    const planBadgeText = { free: 'Free', starter: 'Starter', pro: 'Pro' };
+    
+    document.getElementById('planName').textContent = planNames[plan] || 'Free Plan';
+    document.getElementById('planDesc').textContent = planDescs[plan] || '3 free CV fixes';
+    document.getElementById('planBadge').textContent = planBadgeText[plan] || 'Free';
+    document.getElementById('planBadge').className = 'card-badge ' + (planBadgeClass[plan] || 'badge-free');
+    
+    // Update credits
+    const credits = data.freeUsesLeft || 0;
+    document.getElementById('creditsLeft').textContent = credits;
+    document.getElementById('totalFixes').textContent = data.totalFixes || 0;
+    
+    // Update usage bar
+    const maxCredits = plan === 'free' ? 3 : plan === 'starter' ? 5 : 999;
+    const usagePercent = Math.min(100, (credits / maxCredits) * 100);
+    document.getElementById('usageFill').style.width = usagePercent + '%';
+    document.getElementById('usageText').textContent = credits + ' of ' + maxCredits + ' fixes remaining';
+    
+    // Hide upgrade button for pro users
+    if (plan === 'pro') {
+      document.getElementById('upgradeBtn').style.display = 'none';
+    }
+    
+  } catch (error) {
+    console.error('Account load error:', error);
+  }
+}
+
+// Sign out function
+function signOut() {
+  // Clear localStorage
+  localStorage.removeItem('sessionId');
+  localStorage.removeItem('userId');
+  localStorage.removeItem('userEmail');
+  localStorage.removeItem('ghf_sid');
+  
+  // Clear cookies via API
+  fetch('/api/auth/logout', { 
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  }).catch(() => {});
+  
+  // Redirect to home
+  window.location.href = '/';
+}
+
+// Load account on page load
+loadAccount();
+</script>
+
+</body>
+</html>

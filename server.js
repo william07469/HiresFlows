@@ -311,7 +311,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '1mb' }));
 
 // ⚠️ Security: sadece belirli dosyaları serve et (.env, .cjs, server.js gibi dosyalar açığa çıkmaz)
-const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html'];
+const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html', 'account.html'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const reqPath = req.path === '/' ? '/index.html' : req.path;
@@ -579,6 +579,16 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
     console.error('Login error:', error.message);
     res.status(500).json({ error: 'Login failed' });
   }
+});
+
+// Logout endpoint
+app.post('/api/auth/logout', rateLimit, (req, res) => {
+  // Clear cookies by setting them to expire immediately
+  res.setHeader('Set-Cookie', [
+    'hf_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
+    'hf_user=; Path=/; Max-Age=0; SameSite=Lax'
+  ]);
+  res.json({ success: true });
 });
 
 // Session check endpoint
