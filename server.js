@@ -228,9 +228,49 @@ async function generateWithFallback(apiKey, prompt, modelList = AI_MODELS) {
 // ═══════════════════════════════════════════════════════
 
 const PLANS = {
-  free: { freeUses: 3, name: 'Free', price: 0 },
-  starter: { freeUses: 5, name: 'Starter', price: 9 },
-  pro: { freeUses: Infinity, name: 'Pro', price: 19, isSubscription: true }
+  free: { 
+    freeUses: 3, 
+    name: 'Free', 
+    price: 0,
+    features: {
+      cvFix: true,
+      coverLetter: false,
+      interviewPrep: false,
+      jobTracker: false,
+      mockInterview: false,
+      atsScanner: false,
+      heatmap: false
+    }
+  },
+  starter: { 
+    freeUses: 30, 
+    name: 'Starter', 
+    price: 9,
+    features: {
+      cvFix: true,
+      coverLetter: true,
+      interviewPrep: true,
+      jobTracker: true,
+      mockInterview: false,
+      atsScanner: true,
+      heatmap: true
+    }
+  },
+  pro: { 
+    freeUses: Infinity, 
+    name: 'Pro', 
+    price: 19, 
+    isSubscription: true,
+    features: {
+      cvFix: true,
+      coverLetter: true,
+      interviewPrep: true,
+      jobTracker: true,
+      mockInterview: true,
+      atsScanner: true,
+      heatmap: true
+    }
+  }
 };
 
 // Her saat başı süresi dolmuş abonelikleri temizle
