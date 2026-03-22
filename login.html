@@ -51,6 +51,32 @@
       font-size: 14px;
     }
     
+    .tabs {
+      display: flex;
+      margin-bottom: 24px;
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 4px;
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      border: none;
+      color: #888;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.3s;
+    }
+    
+    .tab.active {
+      background: #6366f1;
+      color: #fff;
+    }
+    
     .form-group {
       margin-bottom: 20px;
       text-align: left;
@@ -63,7 +89,8 @@
       color: #ccc;
     }
     
-    input[type="email"] {
+    input[type="email"],
+    input[type="password"] {
       width: 100%;
       padding: 14px 16px;
       background: #1a1a1a;
@@ -75,11 +102,12 @@
       transition: border-color 0.3s;
     }
     
-    input[type="email"]:focus {
+    input[type="email"]:focus,
+    input[type="password"]:focus {
       border-color: #6366f1;
     }
     
-    button {
+    button[type="submit"] {
       width: 100%;
       padding: 16px;
       background: #6366f1;
@@ -92,11 +120,11 @@
       transition: background 0.3s;
     }
     
-    button:hover {
+    button[type="submit"]:hover {
       background: #4f46e5;
     }
     
-    button:disabled {
+    button[type="submit"]:disabled {
       background: #333;
       cursor: not-allowed;
     }
@@ -163,6 +191,14 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    
+    .form {
+      display: none;
+    }
+    
+    .form.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -174,14 +210,20 @@
     </div>
     
     <h1>Welcome</h1>
-    <p class="subtitle">Enter your email to get started</p>
+    <p class="subtitle">Sign in to optimize your CV</p>
     
-    <form id="loginForm">
+    <div class="tabs">
+      <button class="tab active" data-tab="login">Login</button>
+      <button class="tab" data-tab="register">Register</button>
+    </div>
+    
+    <!-- Login Form -->
+    <form id="loginForm" class="form active">
       <div class="form-group">
-        <label for="email">Email address</label>
+        <label for="loginEmail">Email address</label>
         <input 
           type="email" 
-          id="email" 
+          id="loginEmail" 
           name="email" 
           placeholder="you@example.com"
           required
@@ -189,8 +231,65 @@
         >
       </div>
       
-      <button type="submit" id="submitBtn">
-        <span id="btnText">Continue</span>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input 
+          type="password" 
+          id="loginPassword" 
+          name="password" 
+          placeholder="Your password"
+          required
+          autocomplete="current-password"
+        >
+      </div>
+      
+      <button type="submit" id="loginBtn">
+        <span id="loginBtnText">Login</span>
+      </button>
+    </form>
+    
+    <!-- Register Form -->
+    <form id="registerForm" class="form">
+      <div class="form-group">
+        <label for="registerEmail">Email address</label>
+        <input 
+          type="email" 
+          id="registerEmail" 
+          name="email" 
+          placeholder="you@example.com"
+          required
+          autocomplete="email"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="registerPassword">Password</label>
+        <input 
+          type="password" 
+          id="registerPassword" 
+          name="password" 
+          placeholder="At least 6 characters"
+          required
+          minlength="6"
+          autocomplete="new-password"
+        >
+      </div>
+      
+      <div class="form-group">
+        <label for="confirmPassword">Confirm Password</label>
+        <input 
+          type="password" 
+          id="confirmPassword" 
+          name="confirmPassword" 
+          placeholder="Confirm your password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+        >
+      </div>
+      
+      <button type="submit" id="registerBtn">
+        <span id="registerBtnText">Create Account</span>
       </button>
     </form>
     
@@ -209,60 +308,165 @@
   
   <script>
     const API_URL = window.location.origin;
-    const form = document.getElementById('loginForm');
-    const emailInput = document.getElementById('email');
-    const submitBtn = document.getElementById('submitBtn');
-    const btnText = document.getElementById('btnText');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loginEmailInput = document.getElementById('loginEmail');
+    const loginPasswordInput = document.getElementById('loginPassword');
+    const registerEmailInput = document.getElementById('registerEmail');
+    const registerPasswordInput = document.getElementById('registerPassword');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginBtnText = document.getElementById('loginBtnText');
+    const registerBtn = document.getElementById('registerBtn');
+    const registerBtnText = document.getElementById('registerBtnText');
     const messageDiv = document.getElementById('message');
+    const tabs = document.querySelectorAll('.tab');
     
-    form.addEventListener('submit', async (e) => {
+    // Tab switching
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        const tabName = tab.getAttribute('data-tab');
+        if (tabName === 'login') {
+          loginForm.classList.add('active');
+          registerForm.classList.remove('active');
+        } else {
+          loginForm.classList.remove('active');
+          registerForm.classList.add('active');
+        }
+        
+        messageDiv.innerHTML = '';
+      });
+    });
+    
+    // Login form submission
+    loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       
-      const email = emailInput.value.trim();
-      if (!email) return;
+      const email = loginEmailInput.value.trim();
+      const password = loginPasswordInput.value;
       
-      // UI'ı güncelle
-      submitBtn.disabled = true;
-      btnText.innerHTML = '<span class="spinner"></span> Loading...';
+      if (!email || !password) return;
+      
+      loginBtn.disabled = true;
+      loginBtnText.innerHTML = '<span class="spinner"></span> Loading...';
       messageDiv.innerHTML = '';
       
       try {
-        // Email'den userId oluştur (hash)
-        const encoder = new TextEncoder();
-        const data = encoder.encode(email);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        const userId = 'email_' + hashHex.slice(0, 16);
+        const res = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
         
-        // Session ID oluştur
-        const sessionId = crypto.randomUUID();
+        const data = await res.json();
         
-        // LocalStorage'a kaydet
-        localStorage.setItem('sessionId', sessionId);
-        localStorage.setItem('userId', userId);
-        localStorage.setItem('userEmail', email);
-        
-        // Başarı mesajı
-        messageDiv.innerHTML = `
-          <div class="message success">
-            Welcome! Redirecting...
-          </div>
-        `;
-        
-        // 1 saniye sonra ana sayfaya yönlendir
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 1000);
-        
+        if (res.ok && data.success) {
+          localStorage.setItem('sessionId', data.sessionId);
+          localStorage.setItem('userId', data.userId);
+          localStorage.setItem('userEmail', data.email);
+          
+          messageDiv.innerHTML = `
+            <div class="message success">
+              Welcome back! Redirecting...
+            </div>
+          `;
+          
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+        } else {
+          messageDiv.innerHTML = `
+            <div class="message error">
+              ${data.error || 'Login failed'}
+            </div>
+          `;
+        }
       } catch (error) {
         messageDiv.innerHTML = `
           <div class="message error">
-            Something went wrong. Please try again.
+            Network error. Please try again.
           </div>
         `;
-        submitBtn.disabled = false;
-        btnText.textContent = 'Continue';
+      } finally {
+        loginBtn.disabled = false;
+        loginBtnText.textContent = 'Login';
+      }
+    });
+    
+    // Register form submission
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = registerEmailInput.value.trim();
+      const password = registerPasswordInput.value;
+      const confirmPassword = confirmPasswordInput.value;
+      
+      if (!email || !password || !confirmPassword) return;
+      
+      if (password !== confirmPassword) {
+        messageDiv.innerHTML = `
+          <div class="message error">
+            Passwords do not match
+          </div>
+        `;
+        return;
+      }
+      
+      if (password.length < 6) {
+        messageDiv.innerHTML = `
+          <div class="message error">
+            Password must be at least 6 characters
+          </div>
+        `;
+        return;
+      }
+      
+      registerBtn.disabled = true;
+      registerBtnText.innerHTML = '<span class="spinner"></span> Loading...';
+      messageDiv.innerHTML = '';
+      
+      try {
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+          localStorage.setItem('sessionId', data.sessionId);
+          localStorage.setItem('userId', data.userId);
+          localStorage.setItem('userEmail', data.email);
+          
+          messageDiv.innerHTML = `
+            <div class="message success">
+              Account created! Redirecting...
+            </div>
+          `;
+          
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
+        } else {
+          messageDiv.innerHTML = `
+            <div class="message error">
+              ${data.error || 'Registration failed'}
+            </div>
+          `;
+        }
+      } catch (error) {
+        messageDiv.innerHTML = `
+          <div class="message error">
+            Network error. Please try again.
+          </div>
+        `;
+      } finally {
+        registerBtn.disabled = false;
+        registerBtnText.textContent = 'Create Account';
       }
     });
   </script>

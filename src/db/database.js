@@ -27,6 +27,7 @@ export function initDatabase() {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         email TEXT UNIQUE,
+        password_hash TEXT,
         plan TEXT DEFAULT 'free',
         free_uses_left INTEGER DEFAULT 3,
         total_fixes INTEGER DEFAULT 0,

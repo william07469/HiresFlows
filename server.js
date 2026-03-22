@@ -17,7 +17,7 @@ import { StorageService } from './src/job-tracker/storage-service.js';
 import { ApplicationTracker } from './src/job-tracker/application-tracker.js';
 import { CVVersionManager } from './src/job-tracker/cv-version-manager.js';
 import { PerformanceAnalyzer } from './src/job-tracker/performance-analyzer.js';
-import { initDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions } from './src/db/database.js';
+import { initDatabase, getDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions } from './src/db/database.js';
 
 dotenv.config();
 
@@ -450,6 +450,98 @@ app.get('/api/auth/login', (req, res) => {
 // Auth callback - just redirect to main page
 app.get('/api/auth/callback', (req, res) => {
   res.redirect('/');
+});
+
+// Register endpoint
+app.post('/api/auth/register', rateLimit, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    
+    // Email hash oluştur
+    const userId = 'email_' + crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
+    
+    // Kullanıcı var mı kontrol et
+    const existingUser = getUser(userId);
+    if (existingUser.email) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+    
+    // Şifreyi hashle
+    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+    
+    // Kullanıcıyı kaydet
+    const database = getDatabase();
+    database.prepare(`
+      INSERT OR REPLACE INTO users (id, email, password_hash, plan, free_uses_left, total_fixes)
+      VALUES (?, ?, ?, 'free', 3, 0)
+    `).run(userId, email.toLowerCase().trim(), passwordHash);
+    
+    // Session oluştur
+    const sessionId = crypto.randomUUID();
+    
+    res.json({
+      success: true,
+      sessionId,
+      userId,
+      email: email.toLowerCase().trim(),
+      plan: 'free',
+      freeUsesLeft: 3
+    });
+  } catch (error) {
+    console.error('Register error:', error.message);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Login endpoint
+app.post('/api/auth/login', rateLimit, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password required' });
+    }
+    
+    // Email hash oluştur
+    const userId = 'email_' + crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
+    
+    // Kullanıcıyı bul
+    const database = getDatabase();
+    const user = database.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    // Şifreyi kontrol et
+    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+    if (passwordHash !== user.password_hash) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
+    // Session oluştur
+    const sessionId = crypto.randomUUID();
+    
+    res.json({
+      success: true,
+      sessionId,
+      userId,
+      email: user.email,
+      plan: user.plan,
+      freeUsesLeft: user.free_uses_left
+    });
+  } catch (error) {
+    console.error('Login error:', error.message);
+    res.status(500).json({ error: 'Login failed' });
+  }
 });
 
 // Session check endpoint
