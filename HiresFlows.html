@@ -2964,6 +2964,14 @@
 
     function closePw() { document.getElementById('pwBg').classList.remove('on'); }
 
+    // Whop'tan dönünce paywall'ı kapat ve durumu güncelle
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        closePw();
+        loadUserStatus();
+      }
+    });
+
     async function gotoWhop() {
       try {
         var btn = document.querySelector('.btn-pw');
