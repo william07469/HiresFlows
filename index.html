@@ -2024,6 +2024,7 @@
       <a href="index.html" class="logo">Hires<span>Flows</span></a>
       <div class="nav-buttons">
         <a href="/login.html" class="btn-login" id="loginBtn">Sign In</a>
+        <a href="#" class="btn-login" id="dashboardBtn" onclick="goApp()">Dashboard</a>
         <button class="btn-cta-sm" id="heroBtn">Fix My CV Free →</button>
       </div>
     </nav>
@@ -2067,7 +2068,7 @@
       </div>
 
       <button class="btn-hero" id="heroBtn2">Fix My CV — It's Free →</button>
-      <div class="hero-note">No signup · 3 free fix · Results in 60 seconds</div>
+      <div class="hero-note">3 free fix · Results in 60 seconds</div>
     </div>
 
     <div class="why">
@@ -2184,7 +2185,7 @@
           </div>
         </div>
         <button class="btn-big" id="fixBtn" onclick="doFix()">⚡ Fix My CV Now →</button>
-        <div class="btn-big-note">~30 seconds · 3 free fix · No signup</div>
+        <div class="btn-big-note">~30 seconds · 3 free fix </div>
         <div class="err" id="upErr"></div>
       </div>
 
@@ -2319,6 +2320,20 @@
     const _userEmail = getCookie('hf_user') || localStorage.getItem('userEmail');
     if (_userEmail) {
       localStorage.setItem('userEmail', _userEmail);
+      // Hide Sign In, show Dashboard button
+      var loginBtn = document.getElementById('loginBtn');
+      var dashboardBtn = document.getElementById('dashboardBtn');
+      if (loginBtn) loginBtn.style.display = 'none';
+      if (dashboardBtn) {
+        dashboardBtn.style.display = 'inline-block';
+        dashboardBtn.textContent = _userEmail.split('@')[0];
+      }
+    } else {
+      // Show Sign In, hide Dashboard button
+      var loginBtn = document.getElementById('loginBtn');
+      var dashboardBtn = document.getElementById('dashboardBtn');
+      if (loginBtn) loginBtn.style.display = 'inline-block';
+      if (dashboardBtn) dashboardBtn.style.display = 'none';
     }
 
     // Persistent session ID (cookie'den veya localStorage'dan)
