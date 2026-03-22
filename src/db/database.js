@@ -38,6 +38,13 @@ export function initDatabase() {
       )
     `);
     
+    // Eski tabloya password_hash ekle (eğer yoksa)
+    try {
+      db.exec('ALTER TABLE users ADD COLUMN password_hash TEXT');
+    } catch (e) {
+      // Column already exists, ignore
+    }
+    
     // Fix geçmişi tablosu
     db.exec(`
       CREATE TABLE IF NOT EXISTS fixes (
