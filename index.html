@@ -379,6 +379,32 @@
       transform: translateX(100%)
     }
 
+    .nav-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px
+    }
+
+    .btn-login {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 20px;
+      border-radius: var(--r2);
+      background: transparent;
+      border: 1px solid var(--b3);
+      color: var(--chalk2);
+      cursor: pointer;
+      text-decoration: none;
+      font-family: 'DM Sans', sans-serif;
+      transition: all .25s ease
+    }
+
+    .btn-login:hover {
+      background: var(--s3);
+      border-color: var(--lime);
+      color: var(--lime)
+    }
+
     .hero {
       flex: 1;
       display: flex;
@@ -1992,7 +2018,10 @@
   <div id="landing" class="z1">
     <nav class="l-nav">
       <a href="index.html" class="logo">Hires<span>Flows</span></a>
-      <button class="btn-cta-sm" id="heroBtn">Fix My CV Free →</button>
+      <div class="nav-buttons">
+        <a href="/login.html" class="btn-login" id="loginBtn">Sign In</a>
+        <button class="btn-cta-sm" id="heroBtn">Fix My CV Free →</button>
+      </div>
     </nav>
 
     <div class="hero">
