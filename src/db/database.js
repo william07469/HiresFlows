@@ -82,6 +82,17 @@ function initSqlite() {
       )
     `);
     
+    // Sessions tablosu - server-side session management
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        created_at INTEGER DEFAULT (unixepoch()),
+        expires_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    
     // Seed stats with 14,282 on first run
     const statsExists = sqliteDb.prepare("SELECT value FROM stats WHERE key = 'totalFixes'").get();
     if (!statsExists) {
@@ -152,6 +163,17 @@ async function initPostgres(connectionString) {
       CREATE TABLE IF NOT EXISTS stats (
         key TEXT PRIMARY KEY,
         value INTEGER DEFAULT 0
+      )
+    `);
+    
+    // Sessions tablosu - server-side session management
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+        expires_at BIGINT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
       )
     `);
     
@@ -425,4 +447,65 @@ export async function closeDatabase() {
   if (sqliteDb) {
     sqliteDb.close();
   }
+}
+
+// ═══════════════════════════════════════════════════════
+// SESSION MANAGEMENT - Server-side session validation
+// ═══════════════════════════════════════════════════════
+
+// Session oluştur
+export async function createSession(userId, sessionId, expiresAt) {
+  if (usePostgres) {
+    await query(
+      'INSERT INTO sessions (id, user_id, expires_at) VALUES ($1, $2, $3)',
+      [sessionId, userId, expiresAt]
+    );
+    return;
+  }
+  const db = getDatabase();
+  db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)').run(sessionId, userId, expiresAt);
+}
+
+// Session doğrula ve kullanıcı bilgilerini döndür
+export async function validateSession(sessionId) {
+  if (usePostgres) {
+    const rows = await query(
+      'SELECT * FROM sessions WHERE id = $1 AND expires_at > $2',
+      [sessionId, Date.now()]
+    );
+    return rows[0] || null;
+  }
+  const db = getDatabase();
+  const session = db.prepare('SELECT * FROM sessions WHERE id = ? AND expires_at > ?').get(sessionId, Date.now());
+  return session || null;
+}
+
+// Session sil (logout)
+export async function deleteSession(sessionId) {
+  if (usePostgres) {
+    await query('DELETE FROM sessions WHERE id = $1', [sessionId]);
+    return;
+  }
+  const db = getDatabase();
+  db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+}
+
+// Kullanıcının tüm session'larını sil
+export async function deleteAllUserSessions(userId) {
+  if (usePostgres) {
+    await query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    return;
+  }
+  const db = getDatabase();
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+}
+
+// Eski session'ları temizle
+export async function cleanupExpiredSessions() {
+  if (usePostgres) {
+    await query('DELETE FROM sessions WHERE expires_at < $1', [Date.now()]);
+    return;
+  }
+  const db = getDatabase();
+  db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
 }

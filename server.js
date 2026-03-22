@@ -18,7 +18,7 @@ import { StorageService } from './src/job-tracker/storage-service.js';
 import { ApplicationTracker } from './src/job-tracker/application-tracker.js';
 import { CVVersionManager } from './src/job-tracker/cv-version-manager.js';
 import { PerformanceAnalyzer } from './src/job-tracker/performance-analyzer.js';
-import { initDatabase, getDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions } from './src/db/database.js';
+import { initDatabase, getDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions, createSession, validateSession, deleteSession, deleteAllUserSessions, cleanupExpiredSessions } from './src/db/database.js';
 
 dotenv.config();
 
@@ -249,13 +249,21 @@ function grantAccess(whopUserId, planType, metadata = {}) {
 }
 
 // User identification: Session ID > Whop user ID > IP hash
-function getUserId(req) {
-  // Frontend-generated session ID (stays same across network changes)
+async function getUserId(req) {
+  // Session ID'yi kontrol et (sunucu tarafında doğrula)
   const sessionId = req.headers['x-session-id'];
-  if (sessionId) return 'ses_' + sanitizeText(sessionId, 64);
+  if (sessionId) {
+    const session = await validateSession(sessionId);
+    if (session && session.user_id) {
+      return session.user_id;
+    }
+    // Session geçersiz veya süresi dolmuş - yeni anonim kullanıcı oluştur
+  }
+  
   // Whop user ID
   const whopUserId = req.headers['x-whop-user-id'] || req.body?.whopUserId;
   if (whopUserId) return 'whop_' + sanitizeText(whopUserId, 50);
+  
   // Last resort: IP hash
   const ip = req.ip || req.connection?.remoteAddress || 'unknown';
   return 'ip_' + crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
@@ -390,7 +398,7 @@ console.log('✓ Job Application Tracker initialized');
 // Kullanıcı durumunu döndür (frontend bununla UI'ı günceller)
 app.get('/api/me', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const user = await getUser(userId);
     const planConfig = PLANS[user.plan] || PLANS.free;
     const isPremium = user.plan === 'pro' || (user.plan === 'starter' && user.freeUsesLeft > 0);
@@ -432,7 +440,7 @@ app.get('/api/auth/session', rateLimit, async (req, res) => {
   
   // Session'dan email bul
   // (Basit implementasyon - production'da Redis veya DB kullan)
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const user = await getUser(userId);
   
   res.json({
@@ -515,8 +523,10 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     await createUser(userId, email.toLowerCase().trim(), passwordHash);
     await updateUserEmail(userId, email.toLowerCase().trim());
     
-    // Session oluştur
+    // Session oluştur (sunucu tarafında)
     const sessionId = crypto.randomUUID();
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 gün
+    await createSession(userId, sessionId, expiresAt);
     
     // 30 gün cookie ayarla
     const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
@@ -568,8 +578,10 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
-    // Session oluştur
+    // Session oluştur (sunucu tarafında)
     const sessionId = crypto.randomUUID();
+    const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 gün
+    await createSession(userId, sessionId, expiresAt);
     
     // 30 gün cookie ayarla
     const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
@@ -593,8 +605,15 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
 });
 
 // Logout endpoint
-app.post('/api/auth/logout', rateLimit, (req, res) => {
-  // Clear cookies by setting them to expire immediately
+app.post('/api/auth/logout', rateLimit, async (req, res) => {
+  // Session ID'yi bul
+  const sessionId = req.headers['x-session-id'];
+  if (sessionId) {
+    // Sunucu tarafında session'ı sil
+    await deleteSession(sessionId);
+  }
+  
+  // Cookie temizle
   res.setHeader('Set-Cookie', [
     'hf_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
     'hf_user=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax'
@@ -605,7 +624,7 @@ app.post('/api/auth/logout', rateLimit, (req, res) => {
 // Session check endpoint
 app.get('/api/auth/session', rateLimit, async (req, res) => {
   const sessionId = req.headers['x-session-id'];
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const user = await getUser(userId);
   
   res.json({
@@ -992,7 +1011,7 @@ Return ONLY valid JSON (no markdown, no explanation).`;
 // Cover Letter — paid feature (TEMPORARILY FREE FOR TESTING)
 app.post('/api/generate-cover-letter', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
@@ -1061,7 +1080,7 @@ OUTPUT JSON:
 // Interview Prep — paid feature
 app.post('/api/generate-interview-prep', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
@@ -1130,7 +1149,7 @@ OUTPUT JSON:
 // CV Fix — paid feature (main product) (TEMPORARILY FREE FOR TESTING)
 app.post('/api/fix-cv', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const user = await getUser(userId);
 
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
@@ -1244,7 +1263,7 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
 app.post('/api/create-checkout', rateLimit, async (req, res) => {
   try {
     const { plan } = req.body;
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
 
     let price, planType;
     if (plan === 'pro') {
@@ -1469,7 +1488,7 @@ if (process.env.NODE_ENV !== 'production') {
 // POST /api/applications - Create new application
 app.post('/api/applications', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const { companyName, positionTitle, applicationDate, cvVersionId, jobDescription, interviewDate, interviewNotes } = req.body;
 
     // Validate required fields
@@ -1515,7 +1534,7 @@ app.post('/api/applications', rateLimit, async (req, res) => {
 // GET /api/applications - Get all applications with filters
 app.get('/api/applications', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const { status, startDate, endDate, cvVersionId } = req.query;
 
     // Build filters object
@@ -1538,7 +1557,7 @@ app.get('/api/applications', rateLimit, async (req, res) => {
 // GET /api/applications/:id - Get single application
 app.get('/api/applications/:id', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const applicationId = req.params.id;
 
     const application = applicationTracker.getApplication(userId, applicationId);
@@ -1561,7 +1580,7 @@ app.get('/api/applications/:id', rateLimit, async (req, res) => {
 // PUT /api/applications/:id - Update application
 app.put('/api/applications/:id', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const applicationId = req.params.id;
     const { companyName, positionTitle, status, jobDescription, interviewDate, interviewNotes, statusNotes } = req.body;
 
@@ -1610,7 +1629,7 @@ app.put('/api/applications/:id', rateLimit, async (req, res) => {
 // DELETE /api/applications/:id - Delete application
 app.delete('/api/applications/:id', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const applicationId = req.params.id;
 
     const deleted = applicationTracker.deleteApplication(userId, applicationId);
@@ -1633,7 +1652,7 @@ app.delete('/api/applications/:id', rateLimit, async (req, res) => {
 // GET /api/applications/stats - Get dashboard statistics
 app.get('/api/applications/stats', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const { startDate, endDate } = req.query;
 
     // Build date range filter
@@ -1672,7 +1691,7 @@ app.get('/api/applications/stats', rateLimit, async (req, res) => {
 // GET /api/cv-versions - Get all CV versions
 app.get('/api/cv-versions', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
 
     const cvVersions = cvVersionManager.getAllVersions(userId);
 
@@ -1686,7 +1705,7 @@ app.get('/api/cv-versions', rateLimit, async (req, res) => {
 // POST /api/cv-versions - Create new CV version
 app.post('/api/cv-versions', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const { name, description, atsScore, content, status } = req.body;
 
     // Validate required fields
@@ -1730,7 +1749,7 @@ app.post('/api/cv-versions', rateLimit, async (req, res) => {
 // GET /api/cv-versions/performance - Get CV performance analysis
 app.get('/api/cv-versions/performance', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
 
     const performanceAnalysis = performanceAnalyzer.compareVersions(userId);
 
@@ -1839,14 +1858,14 @@ app.post('/api/analyze-heatmap', rateLimit, async (req, res) => {
 
 // GET applications
 app.get('/api/tracker/applications', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const applications = await getUserApps(userId);
   res.json({ applications });
 });
 
 // POST new application
 app.post('/api/tracker/applications', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const { company, role, url, dateApplied, status, cvVersion, cvScore, notes } = req.body;
   if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
   const app = await addApp(userId, { company, role, url, dateApplied, status, cvVersion, cvScore, notes });
@@ -1855,7 +1874,7 @@ app.post('/api/tracker/applications', rateLimit, async (req, res) => {
 
 // PATCH application status
 app.patch('/api/tracker/applications/:id', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: 'Status required' });
   const app = await updateAppStatus(userId, req.params.id, status);
@@ -1865,7 +1884,7 @@ app.patch('/api/tracker/applications/:id', rateLimit, async (req, res) => {
 
 // DELETE application
 app.delete('/api/tracker/applications/:id', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const ok = await deleteApp(userId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Application not found' });
   res.json({ success: true });
@@ -1873,7 +1892,7 @@ app.delete('/api/tracker/applications/:id', rateLimit, async (req, res) => {
 
 // GET tracker stats
 app.get('/api/tracker/stats', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const userApps = await getUserApps(userId);
   const total = userApps.length;
   const byStatus = { applied: 0, interview: 0, offer: 0, rejected: 0, ghosted: 0 };
@@ -1912,7 +1931,7 @@ app.get('/api/tracker/stats', rateLimit, async (req, res) => {
 
 // GET CV versions
 app.get('/api/tracker/cv-versions', rateLimit, async (req, res) => {
-  const userId = getUserId(req);
+  const userId = await getUserId(req);
   const versions = await getUserCvVersions(userId);
   res.json({ versions });
 });
@@ -1927,7 +1946,7 @@ const interviewSessions = new Map();
 // Start interview — generate questions from CV + JD
 app.post('/api/interview/start', rateLimit, async (req, res) => {
   try {
-    const userId = getUserId(req);
+    const userId = await getUserId(req);
     const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
@@ -2150,5 +2169,15 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✓ http://localhost:${PORT}`);
   console.log(`✓ Plans: Free(${PLANS.free.freeUses}) / Starter(${PLANS.starter.freeUses}) / Pro(∞)`);
   console.log(`✓ Security: CORS, Rate Limit, Input Validation, Access Control`);
-  console.log(`✓ Whop: ${process.env.WHOP_COMPANY_ID ? 'Configured' : '⚠ Missing .env vars'}\n`);
+  console.log(`✓ Whop: ${process.env.WHOP_COMPANY_ID ? 'Configured' : '⚠ Missing .env vars'}`);
+  
+  // Eski session'ları temizle (her 24 saatte bir)
+  cleanupExpiredSessions();
+  setInterval(() => {
+    cleanupExpiredSessions();
+    cleanupExpiredSubscriptions();
+  }, 24 * 60 * 60 * 1000);
+  
+  console.log(`✓ Sessions: Cleanup scheduled every 24h`);
+  console.log(`✓ Database: Connected (Supabase PostgreSQL)\n`);
 });
