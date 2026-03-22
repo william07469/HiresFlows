@@ -387,21 +387,26 @@ console.log('✓ Job Application Tracker initialized');
 // ═══════════════════════════════════════════════════════
 
 // Kullanıcı durumunu döndür (frontend bununla UI'ı günceller)
-app.get('/api/me', rateLimit, (req, res) => {
-  const userId = getUserId(req);
-  const user = getUser(userId);
-  const planConfig = PLANS[user.plan] || PLANS.free;
-  const isPremium = user.plan === 'pro' || (user.plan === 'starter' && user.freeUsesLeft > 0);
-  
-  res.json({
-    userId,
-    plan: user.plan,
-    planName: planConfig.name,
-    freeUsesLeft: user.freeUsesLeft,
-    totalFixes: user.totalFixes,
-    canFix: user.freeUsesLeft > 0 || user.plan === 'pro',
-    isPremium
-  });
+app.get('/api/me', rateLimit, async (req, res) => {
+  try {
+    const userId = getUserId(req);
+    const user = await getUser(userId);
+    const planConfig = PLANS[user.plan] || PLANS.free;
+    const isPremium = user.plan === 'pro' || (user.plan === 'starter' && user.freeUsesLeft > 0);
+    
+    res.json({
+      userId,
+      plan: user.plan,
+      planName: planConfig.name,
+      freeUsesLeft: user.freeUsesLeft,
+      totalFixes: user.totalFixes,
+      canFix: user.freeUsesLeft > 0 || user.plan === 'pro',
+      isPremium
+    });
+  } catch (error) {
+    console.error('/api/me error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // Plan bilgilerini döndür
@@ -418,7 +423,7 @@ app.get('/api/plans', (req, res) => {
 // ═══════════════════════════════════════════════════════
 
 // Kullanıcı oturum durumu
-app.get('/api/auth/session', rateLimit, (req, res) => {
+app.get('/api/auth/session', rateLimit, async (req, res) => {
   const sessionId = req.headers['x-session-id'];
   if (!sessionId) {
     return res.json({ authenticated: false });
@@ -427,7 +432,7 @@ app.get('/api/auth/session', rateLimit, (req, res) => {
   // Session'dan email bul
   // (Basit implementasyon - production'da Redis veya DB kullan)
   const userId = getUserId(req);
-  const user = getUser(userId);
+  const user = await getUser(userId);
   
   res.json({
     authenticated: true,
@@ -469,7 +474,7 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     const userId = 'email_' + crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
     
     // Kullanıcı var mı kontrol et
-    const existingUser = getUser(userId);
+    const existingUser = await getUser(userId);
     if (existingUser.email) {
       return res.status(400).json({ error: 'Email already registered' });
     }
@@ -478,11 +483,8 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
     
     // Kullanıcıyı kaydet
-    const database = getDatabase();
-    database.prepare(`
-      INSERT OR REPLACE INTO users (id, email, password_hash, plan, free_uses_left, total_fixes)
-      VALUES (?, ?, ?, 'free', 3, 0)
-    `).run(userId, email.toLowerCase().trim(), passwordHash);
+    await createUser(userId, email.toLowerCase().trim());
+    await updateUserEmail(userId, email.toLowerCase().trim());
     
     // Session oluştur
     const sessionId = crypto.randomUUID();
@@ -545,10 +547,10 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
 });
 
 // Session check endpoint
-app.get('/api/auth/session', rateLimit, (req, res) => {
+app.get('/api/auth/session', rateLimit, async (req, res) => {
   const sessionId = req.headers['x-session-id'];
   const userId = getUserId(req);
-  const user = getUser(userId);
+  const user = await getUser(userId);
   
   res.json({
     authenticated: !!sessionId,
@@ -560,8 +562,8 @@ app.get('/api/auth/session', rateLimit, (req, res) => {
 });
 
 // Gerçek sayaç
-app.get('/api/stats', (req, res) => {
-  const dbStats = getGlobalStats();
+app.get('/api/stats', async (req, res) => {
+  const dbStats = await getGlobalStats();
   res.json({ totalFixes: dbStats.totalFixes });
 });
 
@@ -935,7 +937,7 @@ Return ONLY valid JSON (no markdown, no explanation).`;
 app.post('/api/generate-cover-letter', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
-    const user = getUser(userId);
+    const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
     }
@@ -987,10 +989,10 @@ OUTPUT JSON:
 
     // Kredi düş
     if (user.plan !== 'pro') {
-      decrementUserCredits(userId);
+      await decrementUserCredits(userId);
     }
-    incrementUserFixes(userId);
-    incrementGlobalFixes();
+    await incrementUserFixes(userId);
+    await incrementGlobalFixes();
 
     res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
@@ -1003,7 +1005,7 @@ OUTPUT JSON:
 app.post('/api/generate-interview-prep', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
-    const user = getUser(userId);
+    const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
     }
@@ -1054,9 +1056,9 @@ OUTPUT JSON:
     const jsonData = JSON.parse(clean);
 
     // Kredi düş
-    if (user.plan !== 'pro') decrementUserCredits(userId);
-    incrementUserFixes(userId);
-    incrementGlobalFixes();
+    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    await incrementUserFixes(userId);
+    await incrementGlobalFixes();
 
     res.json({ ...jsonData, creditsLeft: user.freeUsesLeft });
   } catch (error) {
@@ -1069,7 +1071,7 @@ OUTPUT JSON:
 app.post('/api/fix-cv', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
-    const user = getUser(userId);
+    const user = await getUser(userId);
 
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({
@@ -1146,12 +1148,12 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     }
 
     // Kredi düş
-    if (user.plan !== 'pro') decrementUserCredits(userId);
-    incrementUserFixes(userId);
-    incrementGlobalFixes();
+    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    await incrementUserFixes(userId);
+    await incrementGlobalFixes();
 
     // CV versiyonunu otomatik kaydet
-    const cvVer = addCvVersion(userId, {
+    const cvVer = await addCvVersion(userId, {
       scoreBefore: safeScore,
       scoreAfter: jsonData.scoreAfter || 92,
       style: style.name
@@ -1295,9 +1297,8 @@ app.post('/api/whop-webhook', async (req, res) => {
       const metadata = data.metadata || {};
       const userId = metadata.userId || data.user?.id;
       if (userId) {
-        const user = getUser(userId);
         const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
-        updateUserPlan(userId, 'pro', expiresAt);
+        await updateUserPlan(userId, 'pro', expiresAt);
         console.log(`Membership valid: ${userId}`);
       }
     }
@@ -1308,7 +1309,7 @@ app.post('/api/whop-webhook', async (req, res) => {
       const metadata = data.metadata || {};
       const userId = metadata.userId || data.user?.id;
       if (userId) {
-        updateUserPlan(userId, 'free', null);
+        await updateUserPlan(userId, 'free', null);
         console.log(`Membership invalid: ${userId}`);
       }
     }
@@ -1774,42 +1775,43 @@ app.post('/api/analyze-heatmap', rateLimit, async (req, res) => {
 // ═══════════════════════════════════════════════════════
 
 // GET applications
-app.get('/api/tracker/applications', rateLimit, (req, res) => {
+app.get('/api/tracker/applications', rateLimit, async (req, res) => {
   const userId = getUserId(req);
-  res.json({ applications: getUserApps(userId) });
+  const applications = await getUserApps(userId);
+  res.json({ applications });
 });
 
 // POST new application
-app.post('/api/tracker/applications', rateLimit, (req, res) => {
+app.post('/api/tracker/applications', rateLimit, async (req, res) => {
   const userId = getUserId(req);
   const { company, role, url, dateApplied, status, cvVersion, cvScore, notes } = req.body;
   if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
-  const app = addApp(userId, { company, role, url, dateApplied, status, cvVersion, cvScore, notes });
+  const app = await addApp(userId, { company, role, url, dateApplied, status, cvVersion, cvScore, notes });
   res.json(app);
 });
 
 // PATCH application status
-app.patch('/api/tracker/applications/:id', rateLimit, (req, res) => {
+app.patch('/api/tracker/applications/:id', rateLimit, async (req, res) => {
   const userId = getUserId(req);
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: 'Status required' });
-  const app = updateAppStatus(userId, req.params.id, status);
+  const app = await updateAppStatus(userId, req.params.id, status);
   if (!app) return res.status(404).json({ error: 'Application not found' });
   res.json(app);
 });
 
 // DELETE application
-app.delete('/api/tracker/applications/:id', rateLimit, (req, res) => {
+app.delete('/api/tracker/applications/:id', rateLimit, async (req, res) => {
   const userId = getUserId(req);
-  const ok = deleteApp(userId, req.params.id);
+  const ok = await deleteApp(userId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Application not found' });
   res.json({ success: true });
 });
 
 // GET tracker stats
-app.get('/api/tracker/stats', rateLimit, (req, res) => {
+app.get('/api/tracker/stats', rateLimit, async (req, res) => {
   const userId = getUserId(req);
-  const userApps = getUserApps(userId);
+  const userApps = await getUserApps(userId);
   const total = userApps.length;
   const byStatus = { applied: 0, interview: 0, offer: 0, rejected: 0, ghosted: 0 };
   userApps.forEach(a => { if (byStatus[a.status] !== undefined) byStatus[a.status]++; });
@@ -1820,7 +1822,7 @@ app.get('/api/tracker/stats', rateLimit, (req, res) => {
   const positiveRate = total > 0 ? Math.round((positive / total) * 100) : 0;
 
   // CV version performance
-  const cvVersions = getUserCvVersions(userId);
+  const cvVersions = await getUserCvVersions(userId);
   const versionStats = {};
   userApps.forEach(a => {
     if (!a.cvVersion) return;
@@ -1846,9 +1848,10 @@ app.get('/api/tracker/stats', rateLimit, (req, res) => {
 });
 
 // GET CV versions
-app.get('/api/tracker/cv-versions', rateLimit, (req, res) => {
+app.get('/api/tracker/cv-versions', rateLimit, async (req, res) => {
   const userId = getUserId(req);
-  res.json({ versions: getUserCvVersions(userId) });
+  const versions = await getUserCvVersions(userId);
+  res.json({ versions });
 });
 
 // ═══════════════════════════════════════════════════════
@@ -1862,7 +1865,7 @@ const interviewSessions = new Map();
 app.post('/api/interview/start', rateLimit, async (req, res) => {
   try {
     const userId = getUserId(req);
-    const user = getUser(userId);
+    const user = await getUser(userId);
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
     }
@@ -2013,12 +2016,12 @@ app.post('/api/interview/finish', rateLimit, async (req, res) => {
     if (!session) return res.status(404).json({ error: 'Session expired or not found' });
 
     const userId = session.userId;
-    const user = getUser(userId);
+    const user = await getUser(userId);
 
     // Kredi düş
-    if (user.plan !== 'pro') decrementUserCredits(userId);
-    incrementUserFixes(userId);
-    incrementGlobalFixes();
+    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    await incrementUserFixes(userId);
+    await incrementGlobalFixes();
 
     // Calculate summary
     const answers = session.answers;

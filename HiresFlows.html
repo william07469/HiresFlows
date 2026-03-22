@@ -2778,6 +2778,10 @@
       var err = document.getElementById('upErr');
       err.classList.remove('on');
 
+      if (!localStorage.getItem('userEmail')) {
+        window.location.href = '/login.html';
+        return;
+      }
       if (!cv) {
         err.textContent = 'Please paste or upload your CV first.';
         err.classList.add('on');
