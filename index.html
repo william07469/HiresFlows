@@ -2312,17 +2312,26 @@
     var _userCredits = 1;
     var _userPlan = 'free';
 
-    // Check if user is logged in (has email)
-    const _userEmail = localStorage.getItem('userEmail');
-    if (!_userEmail) {
-      window.location.href = '/login.html';
+    // Cookie'den veya localStorage'dan kullanıcı bilgilerini al
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? match[2] : null;
+    }
+    
+    // Check if user is logged in (cookie or localStorage)
+    const _userEmail = getCookie('hf_user') || localStorage.getItem('userEmail');
+    if (_userEmail) {
+      localStorage.setItem('userEmail', _userEmail);
     }
 
-    // Persistent session ID (survives network changes, unlike IP)
-    var _sessionId = localStorage.getItem('ghf_sid');
+    // Persistent session ID (cookie'den veya localStorage'dan)
+    var _sessionId = getCookie('hf_session') || localStorage.getItem('ghf_sid');
     if (!_sessionId) {
       _sessionId = crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
-      localStorage.setItem('ghf_sid', _sessionId);
+    }
+    localStorage.setItem('ghf_sid', _sessionId);
+    if (_userEmail) {
+      localStorage.setItem('userEmail', _userEmail);
     }
 
     function apiHeaders(extra) {
@@ -2365,6 +2374,10 @@
     }
 
     function goApp() {
+      if (!localStorage.getItem('userEmail')) {
+        window.location.href = '/login.html';
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('app').classList.add('on');
       loadUserStatus();

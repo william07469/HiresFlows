@@ -311,7 +311,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '1mb' }));
 
 // ⚠️ Security: sadece belirli dosyaları serve et (.env, .cjs, server.js gibi dosyalar açığa çıkmaz)
-const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'login.html', 'auth-callback.html'];
+const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const reqPath = req.path === '/' ? '/index.html' : req.path;
@@ -489,6 +489,13 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     // Session oluştur
     const sessionId = crypto.randomUUID();
     
+    // 30 gün cookie ayarla
+    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
+    res.setHeader('Set-Cookie', [
+      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`,
+      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+    ]);
+    
     res.json({
       success: true,
       sessionId,
@@ -516,29 +523,29 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
     const userId = 'email_' + crypto.createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
     
     // Kullanıcıyı bul
-    const database = getDatabase();
-    const user = database.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+    const user = await getUser(userId);
     
-    if (!user || !user.password_hash) {
-      return res.status(401).json({ error: 'Invalid email or password' });
-    }
-    
-    // Şifreyi kontrol et
-    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
-    if (passwordHash !== user.password_hash) {
+    if (!user.email) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
     // Session oluştur
     const sessionId = crypto.randomUUID();
     
+    // 30 gün cookie ayarla
+    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
+    res.setHeader('Set-Cookie', [
+      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`,
+      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+    ]);
+    
     res.json({
       success: true,
       sessionId,
       userId,
-      email: user.email,
+      email: email.toLowerCase().trim(),
       plan: user.plan,
-      freeUsesLeft: user.free_uses_left
+      freeUsesLeft: user.freeUsesLeft
     });
   } catch (error) {
     console.error('Login error:', error.message);
