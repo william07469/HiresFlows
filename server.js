@@ -11,6 +11,7 @@ import pdfParse from 'pdf-parse';
 import PDFDocument from 'pdfkit';
 import zlib from 'zlib';
 import { Whop } from '@whop/sdk';
+import bcrypt from 'bcryptjs';
 import { calculateATSScore, calculateKeywordMatch, extractSkills, generateImprovements } from './ats-analyzer.js';
 import { selectRandomStyle } from './cv-styles.js';
 import { StorageService } from './src/job-tracker/storage-service.js';
@@ -507,11 +508,11 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
     
-    // Şifreyi hashle
-    const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+    // Şifreyi hashle (bcrypt ile)
+    const passwordHash = await bcrypt.hash(password, 10);
     
-    // Kullanıcıyı kaydet
-    await createUser(userId, email.toLowerCase().trim());
+    // Kullanıcıyı kaydet (şifre hash'i dahil)
+    await createUser(userId, email.toLowerCase().trim(), passwordHash);
     await updateUserEmail(userId, email.toLowerCase().trim());
     
     // Session oluştur
@@ -520,8 +521,8 @@ app.post('/api/auth/register', rateLimit, async (req, res) => {
     // 30 gün cookie ayarla
     const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
     res.setHeader('Set-Cookie', [
-      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`,
-      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
+      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`
     ]);
     
     res.json({
@@ -557,14 +558,24 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
+    // Şifre doğrula (bcrypt ile)
+    const passwordHash = user.password_hash;
+    if (!passwordHash) {
+      return res.status(401).json({ error: 'Account not properly set up. Please register again.' });
+    }
+    const isValid = await bcrypt.compare(password, passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    
     // Session oluştur
     const sessionId = crypto.randomUUID();
     
     // 30 gün cookie ayarla
     const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 gün
     res.setHeader('Set-Cookie', [
-      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax`,
-      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+      `hf_session=${sessionId}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`,
+      `hf_user=${email.toLowerCase().trim()}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`
     ]);
     
     res.json({
@@ -585,8 +596,8 @@ app.post('/api/auth/login', rateLimit, async (req, res) => {
 app.post('/api/auth/logout', rateLimit, (req, res) => {
   // Clear cookies by setting them to expire immediately
   res.setHeader('Set-Cookie', [
-    'hf_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax',
-    'hf_user=; Path=/; Max-Age=0; SameSite=Lax'
+    'hf_session=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax',
+    'hf_user=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax'
   ]);
   res.json({ success: true });
 });
@@ -1263,16 +1274,16 @@ function verifyWhopWebhook(req) {
   const signature = req.headers['x-whop-signature'];
   const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
 
-  // Secret yoksa verification'ı atla (testing için)
+  // Secret yoksa hata döndür (güvenlik için asla atlama)
   if (!webhookSecret || webhookSecret === 'YOUR_WHOP_WEBHOOK_SECRET_HERE') {
-    console.warn('⚠️ WHOP_WEBHOOK_SECRET not configured - verification skipped');
-    return;
+    console.error('❌ WHOP_WEBHOOK_SECRET not configured');
+    throw new Error('Webhook secret not configured');
   }
 
-  // Signature yoksa atla (testing için)
+  // Signature yoksa hata döndür
   if (!signature) {
-    console.warn('⚠️ No x-whop-signature header - verification skipped');
-    return;
+    console.error('❌ No x-whop-signature header');
+    throw new Error('No webhook signature provided');
   }
 
   // Parse t=timestamp,v1=signature format (Whop uses this)

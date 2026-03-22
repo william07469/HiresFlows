@@ -226,6 +226,7 @@ async function getUserPg(userId) {
   return {
     id: user.id,
     email: user.email,
+    password_hash: user.password_hash,
     plan: user.plan,
     freeUsesLeft: user.free_uses_left,
     totalFixes: user.total_fixes,
@@ -252,6 +253,7 @@ function getUserSqlite(userId) {
   return {
     id: user.id,
     email: user.email,
+    password_hash: user.password_hash,
     plan: user.plan,
     freeUsesLeft: user.free_uses_left,
     totalFixes: user.total_fixes,
@@ -268,16 +270,16 @@ export function getUserByEmail(email) {
   return getDatabase().prepare('SELECT * FROM users WHERE email = ?').get(email);
 }
 
-export async function createUser(userId, email = null) {
+export async function createUser(userId, email = null, passwordHash = null) {
   if (usePostgres) {
     if (email) {
       const existing = await getUserByEmail(email);
       if (existing) {
-        await query(`UPDATE users SET id = $1, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE email = $2`, [userId, email]);
+        await query(`UPDATE users SET id = $1, password_hash = $2, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE email = $3`, [userId, passwordHash, email]);
         return getUser(userId);
       }
     }
-    await query('INSERT INTO users (id, email, plan, free_uses_left, total_fixes) VALUES ($1, $2, $3, $4, $5)', [userId, email, 'free', 3, 0]);
+    await query('INSERT INTO users (id, email, password_hash, plan, free_uses_left, total_fixes) VALUES ($1, $2, $3, $4, $5, $6)', [userId, email, passwordHash, 'free', 3, 0]);
     return getUser(userId);
   }
   
@@ -285,11 +287,11 @@ export async function createUser(userId, email = null) {
   if (email) {
     const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
     if (existing) {
-      db.prepare(`UPDATE users SET id = ?, updated_at = unixepoch() WHERE email = ?`).run(userId, email);
+      db.prepare(`UPDATE users SET id = ?, password_hash = ?, updated_at = unixepoch() WHERE email = ?`).run(userId, passwordHash, email);
       return getUserSqlite(userId);
     }
   }
-  db.prepare(`INSERT OR REPLACE INTO users (id, email, plan, free_uses_left, total_fixes) VALUES (?, ?, 'free', 3, 0)`).run(userId, email);
+  db.prepare(`INSERT OR REPLACE INTO users (id, email, password_hash, plan, free_uses_left, total_fixes) VALUES (?, ?, ?, 'free', 3, 0)`).run(userId, email, passwordHash);
   return getUserSqlite(userId);
 }
 
