@@ -367,7 +367,8 @@ export async function getStats() {
 
 export async function incrementGlobalFixes() {
   if (usePostgres) {
-    await query(`INSERT INTO stats (key, value) VALUES ('totalFixes', 1) ON CONFLICT (key) DO UPDATE SET value = stats.value + 1`);
+    // Start from 14282 on first insert
+    await query(`INSERT INTO stats (key, value) VALUES ('totalFixes', 14282) ON CONFLICT (key) DO UPDATE SET value = stats.value + 1`);
     return;
   }
   const db = getDatabase();
@@ -375,7 +376,8 @@ export async function incrementGlobalFixes() {
   if (exists) {
     db.prepare("UPDATE stats SET value = value + 1 WHERE key = 'totalFixes'").run();
   } else {
-    db.prepare("INSERT INTO stats (key, value) VALUES ('totalFixes', 1)").run();
+    // Start from 14282 on first insert
+    db.prepare("INSERT INTO stats (key, value) VALUES ('totalFixes', 14282)").run();
   }
 }
 
