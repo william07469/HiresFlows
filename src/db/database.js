@@ -82,6 +82,12 @@ function initSqlite() {
       )
     `);
     
+    // Seed stats with 14,282 on first run
+    const statsExists = sqliteDb.prepare("SELECT value FROM stats WHERE key = 'totalFixes'").get();
+    if (!statsExists) {
+      sqliteDb.prepare("INSERT INTO stats (key, value) VALUES ('totalFixes', 14282)").run();
+    }
+    
     console.log('✓ SQLite initialized at:', DB_PATH);
   } catch (error) {
     console.error('SQLite init failed:', error.message);
@@ -148,6 +154,9 @@ async function initPostgres(connectionString) {
         value INTEGER DEFAULT 0
       )
     `);
+    
+    // Seed stats with 14,282 on first run
+    await client.query(`INSERT INTO stats (key, value) VALUES ('totalFixes', 14282) ON CONFLICT (key) DO NOTHING`);
     
     client.release();
     usePostgres = true;

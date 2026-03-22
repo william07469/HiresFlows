@@ -1025,6 +1025,7 @@ OUTPUT JSON:
     // Kredi düş
     if (user.plan !== 'pro') {
       await decrementUserCredits(userId);
+      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
     }
     await incrementUserFixes(userId);
     await incrementGlobalFixes();
@@ -1091,7 +1092,10 @@ OUTPUT JSON:
     const jsonData = JSON.parse(clean);
 
     // Kredi düş
-    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    if (user.plan !== 'pro') {
+      await decrementUserCredits(userId);
+      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    }
     await incrementUserFixes(userId);
     await incrementGlobalFixes();
 
@@ -1183,7 +1187,10 @@ Missing Keywords: ${keywordMatch ? keywordMatch.criticalMissing.join(', ') : 'No
     }
 
     // Kredi düş
-    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    if (user.plan !== 'pro') {
+      await decrementUserCredits(userId);
+      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    }
     await incrementUserFixes(userId);
     await incrementGlobalFixes();
 
@@ -2054,7 +2061,10 @@ app.post('/api/interview/finish', rateLimit, async (req, res) => {
     const user = await getUser(userId);
 
     // Kredi düş
-    if (user.plan !== 'pro') await decrementUserCredits(userId);
+    if (user.plan !== 'pro') {
+      await decrementUserCredits(userId);
+      user.freeUsesLeft = Math.max(0, user.freeUsesLeft - 1);
+    }
     await incrementUserFixes(userId);
     await incrementGlobalFixes();
 
