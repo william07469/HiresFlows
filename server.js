@@ -1191,7 +1191,7 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
     }
 
     // Whop checkout URL oluştur
-    const checkoutUrl = `https://whop.com/checkout/${planType === 'pro' ? 'pro' : 'starter'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
+    const checkoutUrl = `${planType === 'pro' ? 'https://whop.com/checkout/plan_wHcvaWu8aDiyQ' : 'https://whop.com/checkout/plan_9Z94lJALdGHqK'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
 
     res.json({
       sessionId: 'temp_' + Date.now(),
@@ -1272,7 +1272,7 @@ app.post('/api/whop-webhook', async (req, res) => {
     const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     // Ödeme başarılı — kullanıcıya erişim ver
-    if (event.type === 'payment.succeeded' || event.type === 'checkout.session.completed') {
+    if (event.type === 'payment_succeeded') {
       const payment = event.data;
       const metadata = payment.metadata || {};
       const userId = metadata.userId;
@@ -1289,27 +1289,37 @@ app.post('/api/whop-webhook', async (req, res) => {
       }
     }
 
-    // Subscription renewed — extend access
-    if (event.type === 'subscription.renewed' || event.type === 'subscription.updated') {
+    // Abonelik aktifleşti
+    if (event.type === 'membership_went_valid') {
       const data = event.data;
       const metadata = data.metadata || {};
-      const userId = metadata.userId || data.user_id;
+      const userId = metadata.userId || data.user?.id;
       if (userId) {
         const user = getUser(userId);
-        const expiresAt = user.expiresAt && user.expiresAt > Date.now() ? user.expiresAt + 30 * 24 * 60 * 60 * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000;
+        const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000;
         updateUserPlan(userId, 'pro', expiresAt);
-        console.log(`Subscription renewed: ${userId}`);
+        console.log(`Membership valid: ${userId}`);
       }
     }
 
-    // Abonelik iptali
-    if (event.type === 'subscription.cancelled' || event.type === 'payment.failed') {
+    // Abonelik iptal/bitti
+    if (event.type === 'membership_went_invalid' || event.type === 'membership_cancel_at_period_end_changed') {
       const data = event.data;
       const metadata = data.metadata || {};
-      const userId = metadata.userId;
+      const userId = metadata.userId || data.user?.id;
       if (userId) {
         updateUserPlan(userId, 'free', null);
-        console.log(`Subscription cancelled: ${userId}`);
+        console.log(`Membership invalid: ${userId}`);
+      }
+    }
+
+    // Ödeme başarısız
+    if (event.type === 'payment_failed') {
+      const data = event.data;
+      const metadata = data.metadata || {};
+      const userId = metadata.userId || data.user?.id;
+      if (userId) {
+        console.log(`Payment failed: ${userId}`);
       }
     }
 
