@@ -1315,7 +1315,7 @@ app.post('/api/create-checkout', rateLimit, async (req, res) => {
     }
 
     // Whop checkout URL oluştur
-    const checkoutUrl = `${planType === 'pro' ? 'https://whop.com/checkout/plan_9Z94lJALdGHqK' : 'https://whop.com/checkout/plan_wHcvaWu8aDiyQ'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
+    const checkoutUrl = `${planType === 'pro' ? 'https://whop.com/checkout/plan_Buag3k9cXXXRJ' : 'https://whop.com/checkout/plan_wHcvaWu8aDiyQ'}?metadata[userId]=${userId}&metadata[plan]=${planType}`;
 
     res.json({
       sessionId: 'temp_' + Date.now(),
