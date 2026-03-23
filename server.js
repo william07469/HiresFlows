@@ -18,7 +18,7 @@ import { StorageService } from './src/job-tracker/storage-service.js';
 import { ApplicationTracker } from './src/job-tracker/application-tracker.js';
 import { CVVersionManager } from './src/job-tracker/cv-version-manager.js';
 import { PerformanceAnalyzer } from './src/job-tracker/performance-analyzer.js';
-import { initDatabase, getDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions, createSession, validateSession, deleteSession, deleteAllUserSessions, cleanupExpiredSessions } from './src/db/database.js';
+import { initDatabase, getDatabase, getUser, createUser, updateUserEmail, updateUserPlan, decrementUserCredits, incrementUserFixes, addFixHistory, addCvVersion, getStats, incrementGlobalFixes, getGlobalStats, getAllUsers, cleanupExpiredSubscriptions, createSession, validateSession, deleteSession, deleteAllUserSessions, cleanupExpiredSessions, getAllUsersPaginated, updateUserBan, deleteUser, resetUserCredits } from './src/db/database.js';
 
 dotenv.config();
 
@@ -311,6 +311,48 @@ async function getUserId(req) {
   return 'ip_' + crypto.createHash('sha256').update(ip).digest('hex').slice(0, 16);
 }
 
+// Admin email check
+function isAdminEmail(email) {
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
+}
+
+// Admin middleware - requires email to be in ADMIN_EMAILS
+async function requireAdmin(req, res, next) {
+  const sessionId = req.headers['x-session-id'];
+  if (!sessionId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  const session = await validateSession(sessionId);
+  if (!session || !session.user_id) {
+    return res.status(401).json({ error: 'Invalid session' });
+  }
+  
+  const user = await getUser(session.user_id);
+  if (!user || !user.email || !isAdminEmail(user.email)) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  req.adminUser = user;
+  next();
+}
+
+// Check if user is banned
+async function checkBanned(req, res, next) {
+  const sessionId = req.headers['x-session-id'];
+  if (sessionId) {
+    const session = await validateSession(sessionId);
+    if (session && session.user_id) {
+      const user = await getUser(session.user_id);
+      if (user && user.isBanned) {
+        return res.status(403).json({ error: 'Your account has been banned', reason: user.banReason });
+      }
+    }
+  }
+  next();
+}
+
 // ═══════════════════════════════════════════════════════
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════════════════
@@ -359,10 +401,12 @@ app.use((req, res, next) => {
   next();
 });
 
+app.use(checkBanned);
+
 app.use(express.json({ limit: '1mb' }));
 
 // ⚠️ Security: sadece belirli dosyaları serve et (.env, .cjs, server.js gibi dosyalar açığa çıkmaz)
-const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html', 'account.html'];
+const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html', 'account.html', 'admin.html'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const reqPath = req.path === '/' ? '/index.html' : req.path;
@@ -2243,15 +2287,110 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n✓ http://localhost:${PORT}`);
   console.log(`✓ Plans: Free(${PLANS.free.freeUses}) / Starter(${PLANS.starter.freeUses}) / Pro(∞)`);
   console.log(`✓ Security: CORS, Rate Limit, Input Validation, Access Control`);
-  console.log(`✓ Whop: ${process.env.WHOP_COMPANY_ID ? 'Configured' : '⚠ Missing .env vars'}`);
-  
-  // Eski session'ları temizle (her 24 saatte bir)
-  cleanupExpiredSessions();
-  setInterval(() => {
-    cleanupExpiredSessions();
-    cleanupExpiredSubscriptions();
-  }, 24 * 60 * 60 * 1000);
-  
-  console.log(`✓ Sessions: Cleanup scheduled every 24h`);
-  console.log(`✓ Database: Connected (Supabase PostgreSQL)\n`);
+  console.log(`✓ Admin Panel: ${process.env.ADMIN_EMAILS ? 'Enabled' : 'Not configured (add ADMIN_EMAILS to .env)'}`);
+});
+
+// ═══════════════════════════════════════════════════════
+// ADMIN API ENDPOINTS
+// ═══════════════════════════════════════════════════════
+
+// Get paginated users
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+    const plan = req.query.plan || '';
+    
+    const result = await getAllUsersPaginated(page, limit, search, plan);
+    res.json(result);
+  } catch (error) {
+    console.error('Admin users error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Update user plan
+app.post('/api/admin/users/:userId/plan', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { plan, freeUses, expiresAt } = req.body;
+    
+    if (!['free', 'starter', 'pro'].includes(plan)) {
+      return res.status(400).json({ error: 'Invalid plan' });
+    }
+    
+    await updateUserPlan(userId, plan, freeUses, expiresAt);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin update plan error:', error.message);
+    res.status(500).json({ error: 'Failed to update plan' });
+  }
+});
+
+// Ban/unban user
+app.post('/api/admin/users/:userId/ban', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { banned, reason } = req.body;
+    
+    await updateUserBan(userId, banned, reason);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin ban error:', error.message);
+    res.status(500).json({ error: 'Failed to update ban status' });
+  }
+});
+
+// Reset user credits
+app.post('/api/admin/users/:userId/reset-credits', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { credits } = req.body;
+    
+    await resetUserCredits(userId, credits);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin reset credits error:', error.message);
+    res.status(500).json({ error: 'Failed to reset credits' });
+  }
+});
+
+// Delete user
+app.delete('/api/admin/users/:userId', requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    await deleteUser(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin delete user error:', error.message);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Get admin stats
+app.get('/api/admin/stats', requireAdmin, async (req, res) => {
+  try {
+    const stats = await getStats();
+    const globalStats = await getGlobalStats();
+    
+    const allUsers = await getAllUsers(1000);
+    const bannedCount = allUsers.filter(u => u.is_banned).length;
+    const proCount = allUsers.filter(u => u.plan === 'pro').length;
+    const starterCount = allUsers.filter(u => u.plan === 'starter').length;
+    const freeCount = allUsers.filter(u => u.plan === 'free').length;
+    
+    res.json({
+      ...stats,
+      ...globalStats,
+      bannedCount,
+      proCount,
+      starterCount,
+      freeCount
+    });
+  } catch (error) {
+    console.error('Admin stats error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
 });

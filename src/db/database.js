@@ -43,12 +43,18 @@ function initSqlite() {
         total_fixes INTEGER DEFAULT 0,
         purchased_at INTEGER,
         expires_at INTEGER,
+        is_banned INTEGER DEFAULT 0,
+        ban_reason TEXT,
+        banned_at INTEGER,
         created_at INTEGER DEFAULT (unixepoch()),
         updated_at INTEGER DEFAULT (unixepoch())
       )
     `);
     
     try { sqliteDb.exec('ALTER TABLE users ADD COLUMN password_hash TEXT'); } catch (e) {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0'); } catch (e) {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN ban_reason TEXT'); } catch (e) {}
+    try { sqliteDb.exec('ALTER TABLE users ADD COLUMN banned_at INTEGER'); } catch (e) {}
     
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS fixes (
@@ -125,6 +131,9 @@ async function initPostgres(connectionString) {
         total_fixes INTEGER DEFAULT 0,
         purchased_at BIGINT,
         expires_at BIGINT,
+        is_banned INTEGER DEFAULT 0,
+        ban_reason TEXT,
+        banned_at BIGINT,
         created_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
         updated_at BIGINT DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT
       )
@@ -132,6 +141,18 @@ async function initPostgres(connectionString) {
     
     await client.query(`
       ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT
+    `);
+    
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER DEFAULT 0
+    `);
+    
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT
+    `);
+    
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS banned_at BIGINT
     `);
     
     await client.query(`
@@ -254,6 +275,9 @@ async function getUserPg(userId) {
     totalFixes: user.total_fixes,
     purchasedAt: user.purchased_at,
     expiresAt: user.expires_at,
+    isBanned: user.is_banned === 1,
+    banReason: user.ban_reason,
+    bannedAt: user.banned_at,
     createdAt: user.created_at
   };
 }
@@ -281,6 +305,9 @@ function getUserSqlite(userId) {
     totalFixes: user.total_fixes,
     purchasedAt: user.purchased_at,
     expiresAt: user.expires_at,
+    isBanned: user.is_banned === 1,
+    banReason: user.ban_reason,
+    bannedAt: user.banned_at,
     createdAt: user.created_at
   };
 }
@@ -516,4 +543,111 @@ export async function cleanupExpiredSessions() {
   }
   const db = getDatabase();
   db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+}
+
+// ═══════════════════════════════════════════════════════
+// ADMIN FUNCTIONS - User management
+// ═══════════════════════════════════════════════════════
+
+export async function getAllUsersPaginated(page = 1, limit = 20, search = '', plan = '') {
+  const offset = (page - 1) * limit;
+  let whereClause = '1=1';
+  const params = [];
+  
+  if (search) {
+    whereClause += ` AND (email ILIKE $${params.length + 1} OR id ILIKE $${params.length + 1})`;
+    params.push(`%${search}%`);
+  }
+  
+  if (plan) {
+    whereClause += ` AND plan = $${params.length + 1}`;
+    params.push(plan);
+  }
+  
+  if (usePostgres) {
+    const countRes = await query(`SELECT COUNT(*) as count FROM users WHERE ${whereClause}`, params);
+    const users = await query(`SELECT * FROM users WHERE ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [...params, limit, offset]);
+    return {
+      users: users.map(u => ({
+        id: u.id,
+        email: u.email,
+        plan: u.plan,
+        freeUsesLeft: u.free_uses_left,
+        totalFixes: u.total_fixes,
+        isBanned: u.is_banned === 1,
+        banReason: u.ban_reason,
+        bannedAt: u.banned_at,
+        createdAt: u.created_at
+      })),
+      total: parseInt(countRes[0]?.count || 0),
+      page,
+      limit
+    };
+  }
+  
+  const db = getDatabase();
+  let sql = `SELECT * FROM users WHERE ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  const countSql = `SELECT COUNT(*) as count FROM users WHERE ${whereClause}`;
+  
+  const count = db.prepare(countSql).get(...params);
+  const users = db.prepare(sql).all(...params, limit, offset);
+  
+  return {
+    users: users.map(u => ({
+      id: u.id,
+      email: u.email,
+      plan: u.plan,
+      freeUsesLeft: u.free_uses_left,
+      totalFixes: u.total_fixes,
+      isBanned: u.is_banned === 1,
+      banReason: u.ban_reason,
+      bannedAt: u.banned_at,
+      createdAt: u.created_at
+    })),
+    total: count?.count || 0,
+    page,
+    limit
+  };
+}
+
+export async function updateUserBan(userId, isBanned, banReason = null) {
+  if (usePostgres) {
+    if (isBanned) {
+      await query(`UPDATE users SET is_banned = 1, ban_reason = $1, banned_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $2`, [banReason, userId]);
+    } else {
+      await query(`UPDATE users SET is_banned = 0, ban_reason = NULL, banned_at = NULL, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $1`, [userId]);
+    }
+    return;
+  }
+  
+  const db = getDatabase();
+  if (isBanned) {
+    db.prepare(`UPDATE users SET is_banned = 1, ban_reason = ?, banned_at = unixepoch(), updated_at = unixepoch() WHERE id = ?`).run(banReason, userId);
+  } else {
+    db.prepare(`UPDATE users SET is_banned = 0, ban_reason = NULL, banned_at = NULL, updated_at = unixepoch() WHERE id = ?`).run(userId);
+  }
+}
+
+export async function deleteUser(userId) {
+  if (usePostgres) {
+    await query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    await query('DELETE FROM fixes WHERE user_id = $1', [userId]);
+    await query('DELETE FROM cv_versions WHERE user_id = $1', [userId]);
+    await query('DELETE FROM users WHERE id = $1', [userId]);
+    return;
+  }
+  
+  const db = getDatabase();
+  db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM fixes WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM cv_versions WHERE user_id = ?').run(userId);
+  db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+}
+
+export async function resetUserCredits(userId, credits) {
+  if (usePostgres) {
+    await query(`UPDATE users SET free_uses_left = $1, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $2`, [credits, userId]);
+    return;
+  }
+  getDatabase().prepare(`UPDATE users SET free_uses_left = ?, updated_at = unixepoch() WHERE id = ?`).run(credits, userId);
 }
