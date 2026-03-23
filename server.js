@@ -406,7 +406,7 @@ app.use(checkBanned);
 app.use(express.json({ limit: '1mb' }));
 
 // ⚠️ Security: sadece belirli dosyaları serve et (.env, .cjs, server.js gibi dosyalar açığa çıkmaz)
-const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html', 'account.html', 'admin.html'];
+const STATIC_FILES = ['index.html', 'HiresFlows.html', 'jobs.html', 'how-it-works.html', 'pricing.html', 'terms.html', 'privacy.html', 'favicon.ico', 'greenlogo.png', 'log.png', 'logo.png', 'logo2.png', 'login.html', 'auth-callback.html', 'account.html'];
 app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const reqPath = req.path === '/' ? '/index.html' : req.path;
@@ -2290,9 +2290,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`✓ Admin Panel: ${process.env.ADMIN_EMAILS ? 'Enabled' : 'Not configured (add ADMIN_EMAILS to .env)'}`);
 });
 
-// ═══════════════════════════════════════════════════════
-// ADMIN API ENDPOINTS
-// ═══════════════════════════════════════════════════════
+app.get('/panel/yonetici/kullanicilar', requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, 'admin.html'));
+});
 
 // Get paginated users
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
