@@ -226,7 +226,7 @@ async function loadAccount() {
     document.getElementById('totalFixes').textContent = data.totalFixes || 0;
     
     // Update usage bar
-    const maxCredits = plan === 'free' ? 3 : plan === 'starter' ? 5 : 999;
+    const maxCredits = plan === 'free' ? 3 : plan === 'starter' ? 30 : 999;
     const usagePercent = Math.min(100, (credits / maxCredits) * 100);
     document.getElementById('usageFill').style.width = usagePercent + '%';
     document.getElementById('usageText').textContent = credits + ' of ' + maxCredits + ' fixes remaining';

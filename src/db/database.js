@@ -325,12 +325,20 @@ export async function updateUserEmail(userId, email) {
   getDatabase().prepare(`UPDATE users SET email = ?, updated_at = unixepoch() WHERE id = ?`).run(email, userId);
 }
 
-export async function updateUserPlan(userId, plan, expiresAt = null) {
+export async function updateUserPlan(userId, plan, freeUses = null, expiresAt = null) {
   if (usePostgres) {
-    await query(`UPDATE users SET plan = $1, expires_at = $2, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $3`, [plan, expiresAt, userId]);
+    if (freeUses !== null) {
+      await query(`UPDATE users SET plan = $1, free_uses_left = $2, expires_at = $3, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $4`, [plan, freeUses, expiresAt, userId]);
+    } else {
+      await query(`UPDATE users SET plan = $1, expires_at = $2, updated_at = (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT WHERE id = $3`, [plan, expiresAt, userId]);
+    }
     return;
   }
-  getDatabase().prepare(`UPDATE users SET plan = ?, expires_at = ?, updated_at = unixepoch() WHERE id = ?`).run(plan, expiresAt, userId);
+  if (freeUses !== null) {
+    getDatabase().prepare(`UPDATE users SET plan = ?, free_uses_left = ?, expires_at = ?, updated_at = unixepoch() WHERE id = ?`).run(plan, freeUses, expiresAt, userId);
+  } else {
+    getDatabase().prepare(`UPDATE users SET plan = ?, expires_at = ?, updated_at = unixepoch() WHERE id = ?`).run(plan, expiresAt, userId);
+  }
 }
 
 export async function decrementUserCredits(userId) {

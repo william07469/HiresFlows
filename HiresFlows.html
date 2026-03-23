@@ -3028,24 +3028,40 @@
     }
 
     function goToHeatmap() {
+      if (_userPlan === 'free') {
+        openPw();
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('heatmap').classList.add('on');
       document.getElementById('heatmap').style.display = 'block';
     }
 
     function goToCoverLetter() {
+      if (_userPlan === 'free') {
+        openPw();
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('coverLetter').classList.add('on');
       document.getElementById('coverLetter').style.display = 'block';
     }
 
     function goToInterviewPrep() {
+      if (_userPlan === 'free') {
+        openPw();
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('interviewPrep').classList.add('on');
       document.getElementById('interviewPrep').style.display = 'block';
     }
 
     function goToTracker() {
+      if (_userPlan === 'free') {
+        openPw();
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('trackerPage').classList.add('on');
       document.getElementById('trackerPage').style.display = 'block';
@@ -3053,13 +3069,17 @@
     }
 
     // ═══════════════════════════════════════
-    // MOCK INTERVIEW
+    // MOCK INTERVIEW (sadece Pro için)
     // ═══════════════════════════════════════
     var _miSession = null;
     var _miQuestionNum = 0;
     var _miTotalQ = 0;
 
     function goToMockInterview() {
+      if (_userPlan !== 'pro') {
+        openPw();
+        return;
+      }
       document.getElementById('landing').style.display = 'none';
       document.getElementById('mockInterviewPage').classList.add('on');
       document.getElementById('mockInterviewPage').style.display = 'block';

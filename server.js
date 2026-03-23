@@ -283,8 +283,10 @@ function grantAccess(whopUserId, planType, metadata = {}) {
   const plan = PLANS[planType];
   if (!plan) return false;
 
-  updateUserPlan(whopUserId, planType, plan.isSubscription ? Date.now() + 30 * 24 * 60 * 60 * 1000 : null);
-  console.log(`Access granted: ${whopUserId} → ${planType}`);
+  // Plan değiştiğinde kredi sayısını da güncelle
+  const freeUses = plan.freeUses; // 30 for starter, Infinity for pro, 3 for free
+  updateUserPlan(whopUserId, planType, freeUses, plan.isSubscription ? Date.now() + 30 * 24 * 60 * 60 * 1000 : null);
+  console.log(`Access granted: ${whopUserId} → ${planType} (${freeUses} credits)`);
   return true;
 }
 
@@ -1053,6 +1055,12 @@ app.post('/api/generate-cover-letter', rateLimit, async (req, res) => {
   try {
     const userId = await getUserId(req);
     const user = await getUser(userId);
+    
+    // Plan kontrolü - Cover Letter Starter ve Pro için
+    if (user.plan === 'free') {
+      return res.status(403).json({ error: 'Cover letter requires Starter or Pro plan', code: 'PLAN_REQUIRED', needsUpgrade: true, requiredPlan: 'starter' });
+    }
+    
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
     }
@@ -1122,6 +1130,12 @@ app.post('/api/generate-interview-prep', rateLimit, async (req, res) => {
   try {
     const userId = await getUserId(req);
     const user = await getUser(userId);
+    
+    // Plan kontrolü - Interview Prep Starter ve Pro için
+    if (user.plan === 'free') {
+      return res.status(403).json({ error: 'Interview prep requires Starter or Pro plan', code: 'PLAN_REQUIRED', needsUpgrade: true, requiredPlan: 'starter' });
+    }
+    
     if (user.freeUsesLeft <= 0 && user.plan !== 'pro') {
       return res.status(402).json({ error: 'No credits remaining', code: 'NO_CREDITS', needsUpgrade: true });
     }
@@ -1893,12 +1907,23 @@ app.post('/api/analyze-heatmap', rateLimit, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════
-// ROUTES: Application Tracker
+// ROUTES: Application Tracker (Starter ve Pro için)
 // ═══════════════════════════════════════════════════════
+
+// Plan kontrolü helper
+function checkPaidPlan(user) {
+  if (user.plan === 'free') {
+    return { error: 'Job tracker requires Starter or Pro plan', code: 'PLAN_REQUIRED', needsUpgrade: true, requiredPlan: 'starter' };
+  }
+  return null;
+}
 
 // GET applications
 app.get('/api/tracker/applications', rateLimit, async (req, res) => {
   const userId = await getUserId(req);
+  const user = await getUser(userId);
+  const planError = checkPaidPlan(user);
+  if (planError) return res.status(403).json(planError);
   const applications = await getUserApps(userId);
   res.json({ applications });
 });
@@ -1906,6 +1931,9 @@ app.get('/api/tracker/applications', rateLimit, async (req, res) => {
 // POST new application
 app.post('/api/tracker/applications', rateLimit, async (req, res) => {
   const userId = await getUserId(req);
+  const user = await getUser(userId);
+  const planError = checkPaidPlan(user);
+  if (planError) return res.status(403).json(planError);
   const { company, role, url, dateApplied, status, cvVersion, cvScore, notes } = req.body;
   if (!company || !role) return res.status(400).json({ error: 'Company and role required' });
   const app = await addApp(userId, { company, role, url, dateApplied, status, cvVersion, cvScore, notes });
@@ -1915,6 +1943,9 @@ app.post('/api/tracker/applications', rateLimit, async (req, res) => {
 // PATCH application status
 app.patch('/api/tracker/applications/:id', rateLimit, async (req, res) => {
   const userId = await getUserId(req);
+  const user = await getUser(userId);
+  const planError = checkPaidPlan(user);
+  if (planError) return res.status(403).json(planError);
   const { status } = req.body;
   if (!status) return res.status(400).json({ error: 'Status required' });
   const app = await updateAppStatus(userId, req.params.id, status);
@@ -1925,6 +1956,9 @@ app.patch('/api/tracker/applications/:id', rateLimit, async (req, res) => {
 // DELETE application
 app.delete('/api/tracker/applications/:id', rateLimit, async (req, res) => {
   const userId = await getUserId(req);
+  const user = await getUser(userId);
+  const planError = checkPaidPlan(user);
+  if (planError) return res.status(403).json(planError);
   const ok = await deleteApp(userId, req.params.id);
   if (!ok) return res.status(404).json({ error: 'Application not found' });
   res.json({ success: true });
